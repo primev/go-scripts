@@ -66,7 +66,7 @@ func main() {
 
 	ec := NewETHClient(nil, client)
 
-	publicKeyFilePath := "../../keys.txt" // TODO: change
+	publicKeyFilePath := "../../keys_example.txt"
 	pksAsBytes, err := readBLSPublicKeysFromFile(publicKeyFilePath)
 	if err != nil {
 		log.Fatalf("Failed to read public keys from file: %v", err)

@@ -4,20 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+	utils "github.com/primevprotocol/validator-registry/pkg/utils"
 	vr "github.com/primevprotocol/validator-registry/pkg/validatorregistry"
 )
 
 func main() {
 
-	client, err := ethclient.Dial("https://chainrpc.testnet.mev-commit.xyz")
-	if err != nil {
-		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
-	}
+	client := utils.InitClient()
 
 	chainID, err := client.ChainID(context.Background())
 	if err != nil {
@@ -48,23 +44,7 @@ func main() {
 
 	start := time.Now()
 
-	queryBatchSize := 1000
-	aggregatedValset := make([][]byte, 0)
-	numStakedValsInt := int(numStakedVals.Int64())
-	for i := 0; i < numStakedValsInt; i += queryBatchSize {
-		end := i + queryBatchSize
-		if end > numStakedValsInt {
-			end = numStakedValsInt
-		}
-		vals, valsetVer, err := vrc.GetStakedValidators(nil, big.NewInt(int64(i)), big.NewInt(int64(end)))
-		if err != nil {
-			log.Fatalf("Failed to get staked validators: %v", err)
-		}
-		if valsetVer.Cmp(valsetVersion) != 0 {
-			log.Fatalf("Valset version mismatch from len query: %v != %v", valsetVer, valsetVersion)
-		}
-		aggregatedValset = append(aggregatedValset, vals...)
-	}
+	aggregatedValset := utils.GetStakedValidators(vrc, numStakedVals, valsetVersion)
 	fmt.Println("Aggregated validator set length: ", len(aggregatedValset))
 
 	startIndex := len(aggregatedValset) - 10

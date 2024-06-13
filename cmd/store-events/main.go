@@ -8,13 +8,13 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	utils "github.com/primevprotocol/validator-registry/pkg/utils"
 	vr "github.com/primevprotocol/validator-registry/pkg/validatorregistry"
 	"github.com/urfave/cli/v2"
 )
@@ -179,24 +179,43 @@ func validateEvents(c *cli.Context) error {
 		return err
 	}
 
+	unstakedEvents, err := readEvents("unstaked")
+	if err != nil {
+		return err
+	}
+
 	withdrawnEvents, err := readEvents("withdraw")
 	if err != nil {
 		return err
 	}
 
-	validators := reconstructValidators(stakedEvents, withdrawnEvents)
+	validators := reconstructValidators(stakedEvents, unstakedEvents, withdrawnEvents)
 
-	actualValidators, err := queryActualValidators()
+	recentEventsValidators, err := queryValidatorsFromRecentEvents()
 	if err != nil {
 		return err
 	}
 
-	if compareValidators(validators, actualValidators) {
-		fmt.Println("Validator lists match.")
+	onChainValidators, err := queryOnChainValidators()
+	if err != nil {
+		return err
+	}
+
+	if compareValidators(validators, recentEventsValidators) {
+		fmt.Println("Validator lists match with recent events.")
 	} else {
-		fmt.Println("Validator lists do not match.")
+		fmt.Println("Validator lists do not match with recent events.")
 		fmt.Printf("Reconstructed list length: %d\n", len(validators))
-		fmt.Printf("Actual list length: %d\n", len(actualValidators))
+		fmt.Printf("Recent events list length: %d\n", len(recentEventsValidators))
+	}
+
+	if compareValidators(validators, onChainValidators) {
+		fmt.Println("Validator lists match with on-chain data.")
+		fmt.Println("NOTE THIS ASSUMES NO VALIDATOR HAS GONE THROUGH A STAKE -> UNSTAKE -> WITHDRAW -> STAKE CYCLE")
+	} else {
+		fmt.Println("Validator lists do not match with on-chain data.")
+		fmt.Printf("Reconstructed list length: %d\n", len(validators))
+		fmt.Printf("On-chain list length: %d\n", len(onChainValidators))
 	}
 
 	return nil
@@ -241,7 +260,7 @@ func readEvents(eventType string) ([]Event, error) {
 	return events, nil
 }
 
-func reconstructValidators(stakedEvents, withdrawnEvents []Event) map[string]*big.Int {
+func reconstructValidators(stakedEvents, unstakedEvents, withdrawnEvents []Event) map[string]*big.Int {
 	validators := make(map[string]*big.Int)
 
 	for _, event := range stakedEvents {
@@ -251,16 +270,18 @@ func reconstructValidators(stakedEvents, withdrawnEvents []Event) map[string]*bi
 		validators[event.ValBLSPubKey].Add(validators[event.ValBLSPubKey], event.Amount)
 	}
 
+	for _, event := range unstakedEvents {
+		delete(validators, event.ValBLSPubKey)
+	}
+
 	for _, event := range withdrawnEvents {
-		if _, exists := validators[event.ValBLSPubKey]; exists {
-			validators[event.ValBLSPubKey].Sub(validators[event.ValBLSPubKey], event.Amount)
-		}
+		delete(validators, event.ValBLSPubKey)
 	}
 
 	return validators
 }
 
-func queryActualValidators() (map[string]*big.Int, error) {
+func queryValidatorsFromRecentEvents() (map[string]*big.Int, error) {
 	_, vrf, err := initClientAndFilterer()
 	if err != nil {
 		return nil, err
@@ -272,14 +293,59 @@ func queryActualValidators() (map[string]*big.Int, error) {
 		return nil, err
 	}
 
+	unstakedEvents, err := queryEvents(vrf, filterOpts, "unstaked")
+	if err != nil {
+		return nil, err
+	}
+
 	withdrawnEvents, err := queryEvents(vrf, filterOpts, "withdraw")
 	if err != nil {
 		return nil, err
 	}
 
-	return reconstructValidators(stakedEvents, withdrawnEvents), nil
+	return reconstructValidators(stakedEvents, unstakedEvents, withdrawnEvents), nil
+}
+
+func queryOnChainValidators() (map[string]*big.Int, error) {
+	client := utils.InitClient()
+	contractAddress := common.HexToAddress("0xF263483500e849Bd8d452c9A0F075B606ee64087")
+	vrc, err := vr.NewValidatorregistryCaller(contractAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Validator Registry caller: %v", err)
+	}
+
+	numStakedVals, valsetVersion, err := vrc.GetNumberOfStakedValidators(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get number of staked validators: %v", err)
+	}
+
+	aggregatedValset := utils.GetStakedValidators(vrc, numStakedVals, valsetVersion)
+	validators := make(map[string]*big.Int)
+	for _, val := range aggregatedValset {
+		validators[common.Bytes2Hex(val)] = big.NewInt(0) // Assuming amount is not needed here
+	}
+
+	isOptedIn, err := vrc.IsStaked(nil, []byte("8ed81d776f9de04813920d48bd6f9f3804001e069b0867559a374f1de7d3d7371b4180524844655842cf5a9ffa9f4dcb"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get is opted in: %v", err)
+	}
+	fmt.Printf("Is opted in: %t\n", isOptedIn)
+
+	return validators, nil
 }
 
 func compareValidators(reconstructed, actual map[string]*big.Int) bool {
-	return reflect.DeepEqual(reconstructed, actual)
+	if len(reconstructed) != len(actual) {
+		return false
+	}
+
+	toReturn := true
+	for key := range reconstructed {
+		if _, exists := actual[key]; !exists {
+			fmt.Printf("Key %s is missing in actual validators\n", key)
+			toReturn = false
+		}
+	}
+
+	return toReturn
 }

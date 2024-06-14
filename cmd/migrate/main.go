@@ -19,7 +19,7 @@ import (
 	events "github.com/primevprotocol/validator-registry/pkg/events"
 	query "github.com/primevprotocol/validator-registry/pkg/query"
 	utils "github.com/primevprotocol/validator-registry/pkg/utils"
-	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryV1"
+	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1"
 )
 
 type Batch struct {

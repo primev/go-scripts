@@ -8,23 +8,16 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	events "github.com/primevprotocol/validator-registry/pkg/events"
 	utils "github.com/primevprotocol/validator-registry/pkg/utils"
 	vr "github.com/primevprotocol/validator-registry/pkg/validatorregistry"
 	"github.com/urfave/cli/v2"
 )
-
-type Event struct {
-	TxOriginator string   `json:"tx_originator"`
-	ValBLSPubKey string   `json:"val_bls_pub_key"`
-	Amount       *big.Int `json:"amount"`
-	Block        uint64   `json:"block"`
-}
 
 func main() {
 	app := &cli.App{
@@ -65,8 +58,8 @@ func initClientAndFilterer() (*ethclient.Client, *vr.ValidatorregistryFilterer, 
 	return client, vrf, nil
 }
 
-func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts, eventType string) ([]Event, error) {
-	var events []Event
+func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts, eventType string) ([]events.Event, error) {
+	var e []events.Event
 
 	switch eventType {
 	case "staked":
@@ -76,12 +69,12 @@ func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts,
 		}
 		for iter.Next() {
 			event := iter.Event
-			events = append(events, Event{
-				TxOriginator: event.TxOriginator.Hex(),
-				ValBLSPubKey: common.Bytes2Hex(event.ValBLSPubKey),
-				Amount:       event.Amount,
-				Block:        event.Raw.BlockNumber,
-			})
+			e = append(e, events.NewEvent(
+				event.TxOriginator.Hex(),
+				common.Bytes2Hex(event.ValBLSPubKey),
+				event.Amount,
+				event.Raw.BlockNumber,
+			))
 		}
 		if err := iter.Error(); err != nil {
 			return nil, fmt.Errorf("error encountered during iteration: %v", err)
@@ -93,12 +86,12 @@ func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts,
 		}
 		for iter.Next() {
 			event := iter.Event
-			events = append(events, Event{
-				TxOriginator: event.TxOriginator.Hex(),
-				ValBLSPubKey: common.Bytes2Hex(event.ValBLSPubKey),
-				Amount:       event.Amount,
-				Block:        event.Raw.BlockNumber,
-			})
+			e = append(e, events.NewEvent(
+				event.TxOriginator.Hex(),
+				common.Bytes2Hex(event.ValBLSPubKey),
+				event.Amount,
+				event.Raw.BlockNumber,
+			))
 		}
 		if err := iter.Error(); err != nil {
 			return nil, fmt.Errorf("error encountered during iteration: %v", err)
@@ -110,12 +103,12 @@ func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts,
 		}
 		for iter.Next() {
 			event := iter.Event
-			events = append(events, Event{
-				TxOriginator: event.TxOriginator.Hex(),
-				ValBLSPubKey: common.Bytes2Hex(event.ValBLSPubKey),
-				Amount:       event.Amount,
-				Block:        event.Raw.BlockNumber,
-			})
+			e = append(e, events.NewEvent(
+				event.TxOriginator.Hex(),
+				common.Bytes2Hex(event.ValBLSPubKey),
+				event.Amount,
+				event.Raw.BlockNumber,
+			))
 		}
 		if err := iter.Error(); err != nil {
 			return nil, fmt.Errorf("error encountered during iteration: %v", err)
@@ -124,7 +117,7 @@ func queryEvents(vrf *vr.ValidatorregistryFilterer, filterOpts *bind.FilterOpts,
 		return nil, fmt.Errorf("unknown event type: %s", eventType)
 	}
 
-	return events, nil
+	return e, nil
 }
 
 func storeEvents(c *cli.Context) error {
@@ -145,7 +138,7 @@ func storeEvents(c *cli.Context) error {
 		log.Fatalf("Failed to get latest block number: %v", err)
 	}
 
-	serializeEvents := func(filename string, events []Event) {
+	serializeEvents := func(filename string, events []events.Event) {
 		file, err := os.Create(filepath.Join("../../artifacts", filename))
 		if err != nil {
 			log.Fatalf("Failed to create file: %v", err)
@@ -174,17 +167,17 @@ func storeEvents(c *cli.Context) error {
 }
 
 func validateEvents(c *cli.Context) error {
-	stakedEvents, err := readEvents("staked")
+	stakedEvents, err := events.ReadEvents("staked")
 	if err != nil {
 		return err
 	}
 
-	unstakedEvents, err := readEvents("unstaked")
+	unstakedEvents, err := events.ReadEvents("unstaked")
 	if err != nil {
 		return err
 	}
 
-	withdrawnEvents, err := readEvents("withdraw")
+	withdrawnEvents, err := events.ReadEvents("withdraw")
 	if err != nil {
 		return err
 	}
@@ -221,46 +214,7 @@ func validateEvents(c *cli.Context) error {
 	return nil
 }
 
-func readEvents(eventType string) ([]Event, error) {
-	files, err := filepath.Glob(fmt.Sprintf("../../artifacts/%s_events_*.json", eventType))
-	if err != nil {
-		return nil, fmt.Errorf("failed to list %s event files: %v", eventType, err)
-	}
-
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no %s event files found", eventType)
-	}
-
-	sort.Slice(files, func(i, j int) bool {
-		infoI, err := os.Stat(files[i])
-		if err != nil {
-			log.Fatalf("Failed to stat file %s: %v", files[i], err)
-		}
-		infoJ, err := os.Stat(files[j])
-		if err != nil {
-			log.Fatalf("Failed to stat file %s: %v", files[j], err)
-		}
-		return infoI.ModTime().After(infoJ.ModTime())
-	})
-
-	recentFile := files[0]
-	fmt.Printf("Using artifact file: %s\n", recentFile)
-
-	f, err := os.Open(recentFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file %s: %v", recentFile, err)
-	}
-	defer f.Close()
-
-	var events []Event
-	if err := json.NewDecoder(f).Decode(&events); err != nil {
-		return nil, fmt.Errorf("failed to decode events from file %s: %v", recentFile, err)
-	}
-
-	return events, nil
-}
-
-func reconstructValidators(stakedEvents, unstakedEvents, withdrawnEvents []Event) map[string]*big.Int {
+func reconstructValidators(stakedEvents, unstakedEvents, withdrawnEvents []events.Event) map[string]*big.Int {
 	validators := make(map[string]*big.Int)
 
 	for _, event := range stakedEvents {

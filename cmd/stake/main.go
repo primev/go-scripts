@@ -61,7 +61,7 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry transactor: %v", err)
 	}
 
-	ec := utils.NewETHClient(nil, client)
+	ec := utils.NewETHClient(client)
 
 	publicKeyFilePath := "../../keys_example.txt"
 	pksAsBytes, err := readBLSPublicKeysFromFile(publicKeyFilePath)

@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	events "github.com/primevprotocol/validator-registry/pkg/events"
+	query "github.com/primevprotocol/validator-registry/pkg/query"
 	utils "github.com/primevprotocol/validator-registry/pkg/utils"
 	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryV1"
 )
@@ -118,7 +119,9 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry transactor: %v", err)
 	}
 
-	ec := utils.NewETHClient(nil, client)
+	ec := utils.NewETHClient(client)
+
+	ec.CancelPendingTxes(context.Background(), privateKey)
 
 	e := make(map[string]events.Event)
 
@@ -147,7 +150,27 @@ func main() {
 		delete(e, event.ValBLSPubKey)
 	}
 
-	fmt.Println("Number of validators to check on beacon chain: ", len(e))
+	stakedVals, err := query.GetAllStakedValsFromNewRegistry()
+	if err != nil {
+		log.Fatalf("Failed to get all staked validators: %v", err)
+	}
+
+	for _, stakedVal := range stakedVals {
+		// fmt.Println("Validator already staked: ", stakedVal)
+		delete(e, stakedVal)
+	}
+
+	// TODO: didn't catch this in time and opted in ~20 spam addrs. Will have to withdraw them manually
+	deletedFromDefault := 0
+	for _, event := range e {
+		if event.TxOriginator == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" {
+			delete(e, event.ValBLSPubKey)
+			deletedFromDefault++
+		}
+	}
+	fmt.Println("Number of events deleted from default account: ", deletedFromDefault)
+
+	// fmt.Println("Number of validators to check on beacon chain: ", len(e))
 
 	batches := make(map[string]Batch)
 	// skipped := 0
@@ -234,6 +257,6 @@ func main() {
 			fmt.Printf("Batch %s completed\n", idx)
 			fmt.Println("-------------------")
 		}
-		fmt.Println("All batches completed!")
 	}
+	fmt.Println("All batches completed!")
 }

@@ -4,23 +4,22 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log/slog"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type ETHClient struct {
-	logger *slog.Logger
 	client *ethclient.Client
 }
 
-func NewETHClient(logger *slog.Logger, client *ethclient.Client) *ETHClient {
-	return &ETHClient{logger: logger, client: client}
+func NewETHClient(client *ethclient.Client) *ETHClient {
+	return &ETHClient{client: client}
 }
 
 func (c *ETHClient) CreateTransactOpts(
@@ -69,7 +68,7 @@ func (c *ETHClient) BoostTipForTransactOpts(
 	ctx context.Context,
 	opts *bind.TransactOpts,
 ) error {
-	c.logger.Debug(
+	fmt.Println(
 		"gas params for tx that were not included",
 		"gas_tip", opts.GasTipCap.String(),
 		"gas_fee_cap", opts.GasFeeCap.String(),
@@ -114,8 +113,8 @@ func (c *ETHClient) BoostTipForTransactOpts(
 	opts.GasTipCap = boostedTip
 	opts.GasFeeCap = new(big.Int).Add(boostedBaseFee, boostedTip)
 
-	c.logger.Debug("tip and base fee will be boosted by 10%")
-	c.logger.Debug(
+	fmt.Println("tip and base fee will be boosted by 10%")
+	fmt.Println(
 		"boosted gas",
 		"get_tip_cap", opts.GasTipCap.String(),
 		"gas_fee_cap", opts.GasFeeCap.String(),
@@ -145,7 +144,7 @@ func (c *ETHClient) WaitMinedWithRetry(
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			c.logger.Info("transaction not included within 60 seconds, boosting gas tip by 10%", "attempt", attempt)
+			fmt.Println("transaction not included within 60 seconds, boosting gas tip by 10%", "attempt", attempt)
 			if err := c.BoostTipForTransactOpts(ctx, opts); err != nil {
 				return nil, fmt.Errorf("failed to boost gas tip for attempt %d: %w", attempt, err)
 			}
@@ -154,7 +153,7 @@ func (c *ETHClient) WaitMinedWithRetry(
 		tx, err = submitTx(ctx, opts)
 		if err != nil {
 			if strings.Contains(err.Error(), "replacement transaction underpriced") || strings.Contains(err.Error(), "already known") {
-				c.logger.Error("tx submission failed", "attempt", attempt, "error", err)
+				fmt.Println("tx submission failed", "attempt", attempt, "error", err)
 				continue
 			}
 			return nil, fmt.Errorf("tx submission failed on attempt %d: %w", attempt, err)
@@ -189,4 +188,112 @@ func (c *ETHClient) WaitMinedWithRetry(
 		}
 	}
 	return nil, fmt.Errorf("unexpected error: control flow should not reach end of WaitMinedWithRetry")
+}
+
+func (c *ETHClient) CancelPendingTxes(ctx context.Context, privateKey *ecdsa.PrivateKey) error {
+	if err := c.cancelAllPendingTransactions(ctx, privateKey); err != nil {
+		return err
+	}
+
+	idx := 0
+	timeoutSec := 60
+	for {
+		if idx >= timeoutSec {
+			return fmt.Errorf("timeout: failed to cancel all pending transactions")
+		}
+		exist, err := c.PendingTransactionsExist(ctx, privateKey)
+		if err != nil {
+			return fmt.Errorf("failed to check pending transactions: %w", err)
+		}
+		if !exist {
+			fmt.Println("all pending transactions for signing account have been cancelled")
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+		idx++
+	}
+}
+
+// TODO: Use WaitMinedWithRetry
+func (c *ETHClient) cancelAllPendingTransactions(
+	ctx context.Context,
+	privateKey *ecdsa.PrivateKey,
+) error {
+	chainID, err := c.client.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get chain id: %w", err)
+	}
+	fromAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	currentNonce, err := c.client.PendingNonceAt(ctx, fromAddress)
+	if err != nil {
+		return fmt.Errorf("failed to get current pending nonce: %w", err)
+	}
+	fmt.Println("current pending nonce", "nonce", currentNonce)
+
+	latestNonce, err := c.client.NonceAt(ctx, fromAddress, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get latest nonce: %w", err)
+	}
+	fmt.Println("latest nonce", "nonce", latestNonce)
+
+	if currentNonce <= latestNonce {
+		fmt.Println("no pending transactions to cancel")
+		return nil
+	}
+
+	suggestedGasPrice, err := c.client.SuggestGasPrice(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get suggested gas price: %w", err)
+	}
+	fmt.Println("suggested gas price", "gas_price", suggestedGasPrice.String())
+
+	for nonce := latestNonce; nonce < currentNonce; nonce++ {
+		gasPrice := new(big.Int).Set(suggestedGasPrice)
+		const maxRetries = 5
+		for retry := 0; retry < maxRetries; retry++ {
+			if retry > 0 {
+				increase := new(big.Int).Div(gasPrice, big.NewInt(10))
+				gasPrice = gasPrice.Add(gasPrice, increase)
+				gasPrice = gasPrice.Add(gasPrice, big.NewInt(1))
+				fmt.Println("increased gas price for retry", "retry", retry, "gas_price", gasPrice.String())
+			}
+
+			tx := types.NewTransaction(nonce, fromAddress, big.NewInt(0), 21000, gasPrice, nil)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+			if err != nil {
+				return fmt.Errorf("failed to sign cancellation transaction for nonce %d: %w", nonce, err)
+			}
+
+			err = c.client.SendTransaction(ctx, signedTx)
+			if err != nil {
+				if err.Error() == "replacement transaction underpriced" {
+					fmt.Println("underpriced transaction, increasing gas price", "retry", retry+1, "nonce", nonce, "error", err)
+					continue // Try again with a higher gas price
+				}
+				if err.Error() == "already known" {
+					fmt.Println("already known transaction", "retry", retry+1, "nonce", nonce, "error", err)
+					continue // Try again with a higher gas price
+				}
+				return fmt.Errorf("failed to send cancellation transaction for nonce %d: %w", nonce, err)
+			}
+			fmt.Println("sent cancel transaction", "nonce", nonce, "tx_hash", signedTx.Hash().Hex(), "gas_price", gasPrice.String())
+			break
+		}
+	}
+	return nil
+}
+
+func (c *ETHClient) PendingTransactionsExist(ctx context.Context, privateKey *ecdsa.PrivateKey) (bool, error) {
+	fromAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	currentNonce, err := c.client.PendingNonceAt(ctx, fromAddress)
+	if err != nil {
+		return false, fmt.Errorf("failed to get current pending nonce: %w", err)
+	}
+
+	latestNonce, err := c.client.NonceAt(ctx, fromAddress, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to get latest nonce: %w", err)
+	}
+
+	return currentNonce > latestNonce, nil
 }

@@ -168,43 +168,56 @@ func main() {
 			}
 		}
 
+		biggestBatchSize := 20
 		for idx, batch := range batches {
-			opts, err := ec.CreateTransactOpts(context.Background(), privateKey, chainID)
-			if err != nil {
-				log.Fatalf("Failed to create transact opts: %v", err)
-			}
-			amountPerValidator := new(big.Int)
-			amountPerValidator.SetString("100000000000000", 10) // 0.0001 ether in wei
-			opts.Value = amountPerValidator
-
-			submitTx := func(
-				ctx context.Context,
-				opts *bind.TransactOpts,
-			) (*types.Transaction, error) {
-				tx, err := vrt.DelegateStake(opts, batch.pubKeys, batch.stakeOriginator)
-				if err != nil {
-					return nil, fmt.Errorf("failed to send transaction for batch %s: %w", idx, err)
+			// split into sub batches of 20 or less
+			for i := 0; i < len(batch.pubKeys); i += biggestBatchSize {
+				end := i + biggestBatchSize
+				if end > len(batch.pubKeys) {
+					end = len(batch.pubKeys)
 				}
-				fmt.Printf("Transaction sent for batch %s: %s\n", idx, tx.Hash().Hex())
-				return tx, nil
+				subBatch := batch.pubKeys[i:end]
+
+				opts, err := ec.CreateTransactOpts(context.Background(), privateKey, chainID)
+				if err != nil {
+					log.Fatalf("Failed to create transact opts: %v", err)
+				}
+
+				amountPerValidator := new(big.Int)
+				// 0.0001 ether
+				amountPerValidator.SetString("100000000000000", 10)
+				totalAmount := new(big.Int).Mul(amountPerValidator, big.NewInt(int64(len(subBatch))))
+				opts.Value = totalAmount
+
+				submitTx := func(
+					ctx context.Context,
+					opts *bind.TransactOpts,
+				) (*types.Transaction, error) {
+
+					tx, err := vrt.DelegateStake(opts, subBatch, batch.stakeOriginator)
+					if err != nil {
+						return nil, fmt.Errorf("failed to stake: %w", err)
+					}
+					fmt.Println("DelegateStake tx sent. Transaction hash: ", tx.Hash().Hex())
+					return tx, nil
+				}
+
+				receipt, err := ec.WaitMinedWithRetry(context.Background(), opts, submitTx)
+				if err != nil {
+					log.Fatalf("Failed to wait for stake tx to be mined: %v", err)
+				}
+				fmt.Println("DelegateStake tx included in block: ", receipt.BlockNumber)
+
+				if receipt.Status == 0 {
+					fmt.Println("DelegateStake tx included, but failed. Exiting...")
+					os.Exit(1)
+				}
+
+				fmt.Println("-------------------")
+				fmt.Printf("Batch %s completed\n", idx)
+				fmt.Println("-------------------")
 			}
-
-			receipt, err := ec.WaitMinedWithRetry(context.Background(), opts, submitTx)
-			if err != nil {
-				log.Fatalf("Failed to wait for transaction receipt: %v", err)
-			}
-
-			fmt.Println("Delegate stake tx included in block: ", receipt.BlockNumber)
-
-			if receipt.Status == 0 {
-				fmt.Println("Delegate stake tx included, but failed. Exiting...")
-				os.Exit(1)
-			}
-
-			fmt.Println("-------------------")
-			fmt.Printf("Batch %s completed\n", idx)
-			fmt.Println("-------------------")
+			fmt.Println("All batches completed!")
 		}
-		fmt.Println("All staking batches completed!")
 	}
 }

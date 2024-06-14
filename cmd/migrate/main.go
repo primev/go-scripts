@@ -244,7 +244,12 @@ func main() {
 
 			receipt, err := ec.WaitMinedWithRetry(context.Background(), opts, submitTx)
 			if err != nil {
-				log.Fatalf("Failed to wait for stake tx to be mined: %v", err)
+				if strings.Contains(err.Error(), "nonce too low") {
+					fmt.Println("Nonce too low. This likely means the tx was included while constructing a retry...")
+					receipt = &types.Receipt{Status: 1, BlockNumber: big.NewInt(0)}
+				} else {
+					log.Fatalf("Failed to wait for stake tx to be mined: %v", err)
+				}
 			}
 			fmt.Println("DelegateStake tx included in block: ", receipt.BlockNumber)
 

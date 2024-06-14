@@ -150,31 +150,33 @@ func main() {
 	fmt.Println("Number of validators to check on beacon chain: ", len(e))
 
 	batches := make(map[string]Batch)
-	skipped := 0
+	// skipped := 0
 	batched := 0
 	for _, event := range e {
-		registered, err := isValidatorRegisteredWithBeaconChain(event.ValBLSPubKey)
-		if err != nil {
-			log.Fatalf("Failed to check validator registration with beacon chain: %v", err)
-		}
-		if registered {
-			fmt.Println("Validator is registered with beacon chain: ", event.ValBLSPubKey)
-			batched++
-			if batch, exists := batches[event.TxOriginator]; exists {
-				batch.pubKeys = append(batch.pubKeys, common.Hex2Bytes(event.ValBLSPubKey))
-				batches[event.TxOriginator] = batch
-			} else {
-				batches[event.TxOriginator] = Batch{
-					pubKeys:         [][]byte{common.Hex2Bytes(event.ValBLSPubKey)},
-					stakeOriginator: common.HexToAddress(event.TxOriginator),
-				}
-			}
+		// registered, err := isValidatorRegisteredWithBeaconChain(event.ValBLSPubKey)
+		// if err != nil {
+		// 	log.Fatalf("Failed to check validator registration with beacon chain: %v", err)
+		// }
+		// if registered {
+		// fmt.Println("Validator is registered with beacon chain: ", event.ValBLSPubKey)
+
+		batched++
+		if batch, exists := batches[event.TxOriginator]; exists {
+			batch.pubKeys = append(batch.pubKeys, common.Hex2Bytes(event.ValBLSPubKey))
+			batches[event.TxOriginator] = batch
 		} else {
-			fmt.Printf("Skipping validator who is not registered with beacon chain: %s\n", event.ValBLSPubKey)
-			skipped++
+			batches[event.TxOriginator] = Batch{
+				pubKeys:         [][]byte{common.Hex2Bytes(event.ValBLSPubKey)},
+				stakeOriginator: common.HexToAddress(event.TxOriginator),
+			}
 		}
+
+		// } else {
+		// 	fmt.Printf("Skipping validator who is not registered with beacon chain: %s\n", event.ValBLSPubKey)
+		// 	skipped++
+		// }
 	}
-	fmt.Println("Number of validators skipped for not being registered with beacon chain: ", skipped)
+	// fmt.Println("Number of validators skipped for not being registered with beacon chain: ", skipped)
 	fmt.Println("Number of validators batched: ", batched)
 
 	// print lens of batches
@@ -182,8 +184,6 @@ func main() {
 	for _, batch := range batches {
 		fmt.Println("Batch size: ", len(batch.pubKeys))
 	}
-
-	panic("got here")
 
 	biggestBatchSize := 20
 	for idx, batch := range batches {

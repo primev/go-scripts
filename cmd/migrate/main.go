@@ -160,7 +160,6 @@ func main() {
 		delete(e, stakedVal)
 	}
 
-	// TODO: didn't catch this in time and opted in ~20 spam addrs. Will have to withdraw them manually
 	deletedFromDefault := 0
 	for _, event := range e {
 		if event.TxOriginator == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" {

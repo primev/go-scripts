@@ -8,14 +8,17 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/events"
 	"github.com/primevprotocol/validator-registry/pkg/query"
+	"github.com/primevprotocol/validator-registry/pkg/utils"
 	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1"
 	vrv1_aug15 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1_aug15"
 )
@@ -118,9 +121,7 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry aug15 transactor: %v", err)
 	}
 
-	fmt.Println("vrta15: ", vrta15)
-
-	// ec := utils.NewETHClient(client)
+	ec := utils.NewETHClient(client)
 	// ec.CancelPendingTxes(context.Background(), privateKey)
 
 	currentBlock, err := client.BlockByNumber(context.Background(), nil)
@@ -214,64 +215,60 @@ func main() {
 	fmt.Println("Number of batches: ", len(batches))
 	for _, batch := range batches {
 		fmt.Println("Batch size: ", len(batch.pubKeys))
+		fmt.Println("Stake originator: ", batch.stakeOriginator.Hex())
 	}
 
-	// biggestBatchSize := 20
-	// for idx, batch := range batches {
-	// 	// split into sub batches of 20 or less
-	// 	for i := 0; i < len(batch.pubKeys); i += biggestBatchSize {
-	// 		end := i + biggestBatchSize
-	// 		if end > len(batch.pubKeys) {
-	// 			end = len(batch.pubKeys)
-	// 		}
-	// 		subBatch := batch.pubKeys[i:end]
+	biggestBatchSize := 20
+	for idx, batch := range batches {
+		// split into sub batches of 20 or less
+		for i := 0; i < len(batch.pubKeys); i += biggestBatchSize {
+			end := i + biggestBatchSize
+			if end > len(batch.pubKeys) {
+				end = len(batch.pubKeys)
+			}
+			subBatch := batch.pubKeys[i:end]
 
-	// 		opts, err := ec.CreateTransactOpts(context.Background(), privateKey, chainID)
-	// 		if err != nil {
-	// 			log.Fatalf("Failed to create transact opts: %v", err)
-	// 		}
+			amountPerValidator := new(big.Int)
+			// 0.0001 ether
+			amountPerValidator.SetString("100000000000000", 10)
+			totalAmount := new(big.Int).Mul(amountPerValidator, big.NewInt(int64(len(subBatch))))
+			tOpts.Value = totalAmount
 
-	// 		amountPerValidator := new(big.Int)
-	// 		// 0.0001 ether
-	// 		amountPerValidator.SetString("100000000000000", 10)
-	// 		totalAmount := new(big.Int).Mul(amountPerValidator, big.NewInt(int64(len(subBatch))))
-	// 		opts.Value = totalAmount
+			submitTx := func(
+				ctx context.Context,
+				opts *bind.TransactOpts,
+			) (*types.Transaction, error) {
 
-	// 		submitTx := func(
-	// 			ctx context.Context,
-	// 			opts *bind.TransactOpts,
-	// 		) (*types.Transaction, error) {
+				tx, err := vrta15.DelegateStake(opts, subBatch, batch.stakeOriginator)
+				if err != nil {
+					return nil, fmt.Errorf("failed to stake: %w", err)
+				}
+				fmt.Println("DelegateStake tx sent. Transaction hash: ", tx.Hash().Hex())
+				return tx, nil
+			}
 
-	// 			tx, err := vrt.DelegateStake(opts, subBatch, batch.stakeOriginator)
-	// 			if err != nil {
-	// 				return nil, fmt.Errorf("failed to stake: %w", err)
-	// 			}
-	// 			fmt.Println("DelegateStake tx sent. Transaction hash: ", tx.Hash().Hex())
-	// 			return tx, nil
-	// 		}
+			receipt, err := ec.WaitMinedWithRetry(context.Background(), tOpts, submitTx)
+			if err != nil {
+				if strings.Contains(err.Error(), "nonce too low") {
+					fmt.Println("Nonce too low. This likely means the tx was included while constructing a retry...")
+					receipt = &types.Receipt{Status: 1, BlockNumber: big.NewInt(0)}
+				} else {
+					log.Fatalf("Failed to wait for stake tx to be mined: %v", err)
+				}
+			}
+			fmt.Println("DelegateStake tx included in block: ", receipt.BlockNumber)
 
-	// 		receipt, err := ec.WaitMinedWithRetry(context.Background(), opts, submitTx)
-	// 		if err != nil {
-	// 			if strings.Contains(err.Error(), "nonce too low") {
-	// 				fmt.Println("Nonce too low. This likely means the tx was included while constructing a retry...")
-	// 				receipt = &types.Receipt{Status: 1, BlockNumber: big.NewInt(0)}
-	// 			} else {
-	// 				log.Fatalf("Failed to wait for stake tx to be mined: %v", err)
-	// 			}
-	// 		}
-	// 		fmt.Println("DelegateStake tx included in block: ", receipt.BlockNumber)
+			if receipt.Status == 0 {
+				fmt.Println("DelegateStake tx included, but failed. Exiting...")
+				os.Exit(1)
+			}
 
-	// 		if receipt.Status == 0 {
-	// 			fmt.Println("DelegateStake tx included, but failed. Exiting...")
-	// 			os.Exit(1)
-	// 		}
-
-	// 		fmt.Println("-------------------")
-	// 		fmt.Printf("Batch %s completed\n", idx)
-	// 		fmt.Println("-------------------")
-	// 	}
-	// }
-	// fmt.Println("All batches completed!")
+			fmt.Println("-------------------")
+			fmt.Printf("Batch %s completed\n", idx)
+			fmt.Println("-------------------")
+		}
+	}
+	fmt.Println("All batches completed!")
 }
 
 func SuggestGasTipCapAndPrice(ctx context.Context, client *ethclient.Client) (

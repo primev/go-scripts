@@ -5,11 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
+	"path/filepath"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/events"
 	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1"
@@ -22,23 +25,47 @@ type Batch struct {
 }
 
 func main() {
-	// TODO: can change to keystore
-	privateKeyString := os.Getenv("PRIVATE_KEY")
-	if privateKeyString == "" {
-		fmt.Println("PRIVATE_KEY env var not supplied")
-		os.Exit(1)
+
+	keystorePath := os.Getenv("PRIVATE_KEYSTORE_PATH")
+	if keystorePath == "" {
+		log.Fatalf("PRIVATE_KEYSTORE_PATH is not set")
 	}
 
-	if privateKeyString[:2] == "0x" {
-		privateKeyString = privateKeyString[2:]
-	}
-	privateKey, err := crypto.HexToECDSA(privateKeyString)
+	_, err := os.Stat(keystorePath)
 	if err != nil {
-		fmt.Println("Failed to parse private key")
-		os.Exit(1)
+		log.Fatalf("Failed to stat keystore path: %v", err)
 	}
-	// TODO: remove
-	fmt.Println("privateKey: ", privateKey)
+
+	keystorePassword := os.Getenv("PRIVATE_KEYSTORE_PASSWORD")
+	if keystorePassword == "" {
+		log.Fatalf("PRIVATE_KEYSTORE_PASSWORD is not set")
+	}
+
+	dir := filepath.Dir(keystorePath)
+
+	keystore := keystore.NewKeyStore(dir, keystore.LightScryptN, keystore.LightScryptP)
+	ksAccounts := keystore.Accounts()
+
+	var account accounts.Account
+	if len(ksAccounts) == 0 {
+		log.Fatalf("no accounts in dir: %s", dir)
+	} else {
+		found := false
+		for _, acc := range ksAccounts {
+			if acc.Address == common.HexToAddress("0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1") {
+				account = acc
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Fatalf("account %s not found in keystore dir: %s", "0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1", dir)
+		}
+	}
+
+	if err := keystore.Unlock(account, keystorePassword); err != nil {
+		log.Fatalf("failed to unlock account: %v", err)
+	}
 
 	client, err := ethclient.Dial("https://ethereum-holesky-rpc.publicnode.com")
 	if err != nil {
@@ -51,16 +78,32 @@ func main() {
 	}
 	fmt.Println("Chain ID: ", chainID)
 
-	// TODO: add this back
+	tOpts, err := bind.NewKeyStoreTransactorWithChainID(keystore, account, chainID)
+	if err != nil {
+		log.Fatalf("failed to get auth: %v", err)
+	}
+	tOpts.From = account.Address
+	nonce, err := client.PendingNonceAt(context.Background(), account.Address)
+	if err != nil {
+		log.Fatalf("failed to get pending nonce: %v", err)
+	}
+	tOpts.Nonce = big.NewInt(int64(nonce))
 
-	// fromAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
-	// balance, err := client.BalanceAt(context.Background(), fromAddress, nil)
-	// if err != nil {
-	// 	log.Fatalf("Failed to get account balance: %v", err)
-	// }
-	// if balance.Cmp(big.NewInt(1000000000000000000)) == -1 {
-	// 	log.Fatalf("Insufficient balance. Please fund %v with at least 1 ETH", fromAddress.Hex())
-	// }
+	gasTip, gasPrice, err := SuggestGasTipCapAndPrice(context.Background(), client)
+	if err != nil {
+		log.Fatalf("failed to suggest gas tip cap and price: %v", err)
+	}
+	tOpts.GasFeeCap = gasPrice
+	tOpts.GasTipCap = gasTip
+	tOpts.GasLimit = 300000
+
+	balance, err := client.BalanceAt(context.Background(), account.Address, nil)
+	if err != nil {
+		log.Fatalf("Failed to get account balance: %v", err)
+	}
+	if balance.Cmp(big.NewInt(1000000000000000000)) == -1 {
+		log.Fatalf("Insufficient balance. Please fund %v with at least 1 ETH", account.Address.Hex())
+	}
 
 	oldValRegAddr := common.HexToAddress("0x5d4fC7B5Aeea4CF4F0Ca6Be09A2F5AaDAd2F2803") // Holesky validator registry 6/13
 
@@ -78,10 +121,7 @@ func main() {
 	fmt.Println("vrta15: ", vrta15)
 
 	// ec := utils.NewETHClient(client)
-
 	// ec.CancelPendingTxes(context.Background(), privateKey)
-
-	// e := make(map[string]events.Event)
 
 	currentBlock, err := client.BlockByNumber(context.Background(), nil)
 	if err != nil {
@@ -90,7 +130,7 @@ func main() {
 	fmt.Println("Current block: ", currentBlock.NumberU64())
 
 	// // obtain events from old registry, in batches of 50000
-	totEvents := []events.Event{}
+	totEvents := make(map[string]events.Event)
 	for i := 0; i < int(currentBlock.NumberU64()); i += 50000 {
 		start := uint64(i)
 		end := uint64(i + 50000)
@@ -112,7 +152,7 @@ func main() {
 				TxOriginator: stakedEvents.Event.TxOriginator.Hex(),
 				Amount:       stakedEvents.Event.Amount,
 			}
-			totEvents = append(totEvents, event)
+			totEvents[event.ValBLSPubKey] = event
 		}
 		fmt.Println("Next iteration")
 	}
@@ -128,10 +168,16 @@ func main() {
 	fmt.Println("Number of events: ", numEvents)
 
 	// print first 1000 events
-	for i := 0; i < 1000; i++ {
-		fmt.Println(totEvents[i])
+	i := 0
+	for _, event := range totEvents {
+		if i >= 1000 {
+			break
+		}
+		fmt.Println(event)
 		fmt.Println("-------------------")
+		i++
 	}
+	panic("stop here")
 
 	// TODO: delete both default account events, and events from vals that are no longer staked=true
 	// TODO: confirm stake originator is what we care about here.. it shouldn't be the addr you used to migrate.
@@ -240,4 +286,20 @@ func main() {
 	// 	}
 	// }
 	// fmt.Println("All batches completed!")
+}
+
+func SuggestGasTipCapAndPrice(ctx context.Context, client *ethclient.Client) (
+	gasTip *big.Int, gasPrice *big.Int, err error) {
+
+	// Returns priority fee per gas
+	gasTip, err = client.SuggestGasTipCap(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get gas tip cap: %w", err)
+	}
+	// Returns priority fee per gas + base fee per gas
+	gasPrice, err = client.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get gas price: %w", err)
+	}
+	return gasTip, gasPrice, nil
 }

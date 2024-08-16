@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/events"
+	"github.com/primevprotocol/validator-registry/pkg/query"
 	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1"
 	vrv1_aug15 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1_aug15"
 )
@@ -106,18 +107,17 @@ func main() {
 	}
 
 	oldValRegAddr := common.HexToAddress("0x5d4fC7B5Aeea4CF4F0Ca6Be09A2F5AaDAd2F2803") // Holesky validator registry 6/13
-
 	vrf, err := vrv1.NewValidatorregistryv1Filterer(oldValRegAddr, client)
 	if err != nil {
 		log.Fatalf("Failed to create Validator Registry filterer: %v", err)
 	}
 
-	vrta15, err := vrv1_aug15.NewValidatorregistryv1Transactor(oldValRegAddr, client)
+	newValRegAddr := common.HexToAddress("0x87D5F694fAD0b6C8aaBCa96277DE09451E277Bcf")
+	vrta15, err := vrv1_aug15.NewValidatorregistryv1Transactor(newValRegAddr, client)
 	if err != nil {
 		log.Fatalf("Failed to create Validator Registry aug15 transactor: %v", err)
 	}
 
-	fmt.Println("vrf: ", vrf)
 	fmt.Println("vrta15: ", vrta15)
 
 	// ec := utils.NewETHClient(client)
@@ -157,6 +157,35 @@ func main() {
 		fmt.Println("Next iteration")
 	}
 
+	deletedFromDefault := 0
+	for _, event := range totEvents {
+		if event.TxOriginator == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" {
+			delete(totEvents, event.ValBLSPubKey)
+			deletedFromDefault++
+		}
+	}
+	fmt.Println("Number of events deleted from default account: ", deletedFromDefault)
+
+	stakedValidators, err := query.GetAllStakedValsFromRegistry()
+	if err != nil {
+		log.Fatalf("Failed to get staked validators: %v", err)
+	}
+
+	stakedValidatorsMap := make(map[string]bool)
+	for _, validator := range stakedValidators {
+		stakedValidatorsMap[validator] = true
+	}
+
+	// delete events from vals that are not in stakedValidators
+	deletedFromStaked := 0
+	for _, event := range totEvents {
+		if !stakedValidatorsMap[event.ValBLSPubKey] {
+			delete(totEvents, event.ValBLSPubKey)
+			deletedFromStaked++
+		}
+	}
+	fmt.Println("Number of events deleted from staked validators: ", deletedFromStaked)
+
 	numEvents := 0
 	for _, event := range totEvents {
 		numEvents++
@@ -165,70 +194,27 @@ func main() {
 		fmt.Println(event.Amount)
 		fmt.Println("-------------------")
 	}
-	fmt.Println("Number of events: ", numEvents)
+	fmt.Println("Number of events to act upon: ", numEvents)
 
-	// print first 1000 events
-	i := 0
+	// organize into map of txOriginator to slice of pubKeys
+	batches := make(map[string]Batch)
 	for _, event := range totEvents {
-		if i >= 1000 {
-			break
+		if batch, exists := batches[event.TxOriginator]; exists {
+			batch.pubKeys = append(batch.pubKeys, common.Hex2Bytes(event.ValBLSPubKey))
+			batches[event.TxOriginator] = batch
+		} else {
+			batches[event.TxOriginator] = Batch{
+				pubKeys:         [][]byte{common.Hex2Bytes(event.ValBLSPubKey)},
+				stakeOriginator: common.HexToAddress(event.TxOriginator),
+			}
 		}
-		fmt.Println(event)
-		fmt.Println("-------------------")
-		i++
 	}
-	panic("stop here")
 
-	// TODO: delete both default account events, and events from vals that are no longer staked=true
-	// TODO: confirm stake originator is what we care about here.. it shouldn't be the addr you used to migrate.
-	// but even if we're using the wrong account here, just get the data migrated..
-
-	// deletedFromDefault := 0
-	// for _, event := range e {
-	// 	if event.TxOriginator == "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" {
-	// 		delete(e, event.ValBLSPubKey)
-	// 		deletedFromDefault++
-	// 	}
-	// }
-	// fmt.Println("Number of events deleted from default account: ", deletedFromDefault)
-
-	// // fmt.Println("Number of validators to check on beacon chain: ", len(e))
-
-	// batches := make(map[string]Batch)
-	// // skipped := 0
-	// batched := 0
-	// for _, event := range e {
-	// 	// registered, err := isValidatorRegisteredWithBeaconChain(event.ValBLSPubKey)
-	// 	// if err != nil {
-	// 	// 	log.Fatalf("Failed to check validator registration with beacon chain: %v", err)
-	// 	// }
-	// 	// if registered {
-	// 	// fmt.Println("Validator is registered with beacon chain: ", event.ValBLSPubKey)
-
-	// 	batched++
-	// 	if batch, exists := batches[event.TxOriginator]; exists {
-	// 		batch.pubKeys = append(batch.pubKeys, common.Hex2Bytes(event.ValBLSPubKey))
-	// 		batches[event.TxOriginator] = batch
-	// 	} else {
-	// 		batches[event.TxOriginator] = Batch{
-	// 			pubKeys:         [][]byte{common.Hex2Bytes(event.ValBLSPubKey)},
-	// 			stakeOriginator: common.HexToAddress(event.TxOriginator),
-	// 		}
-	// 	}
-
-	// 	// } else {
-	// 	// 	fmt.Printf("Skipping validator who is not registered with beacon chain: %s\n", event.ValBLSPubKey)
-	// 	// 	skipped++
-	// 	// }
-	// }
-	// // fmt.Println("Number of validators skipped for not being registered with beacon chain: ", skipped)
-	// fmt.Println("Number of validators batched: ", batched)
-
-	// // print lens of batches
-	// fmt.Println("Number of batches: ", len(batches))
-	// for _, batch := range batches {
-	// 	fmt.Println("Batch size: ", len(batch.pubKeys))
-	// }
+	// print lens of batches
+	fmt.Println("Number of batches: ", len(batches))
+	for _, batch := range batches {
+		fmt.Println("Batch size: ", len(batch.pubKeys))
+	}
 
 	// biggestBatchSize := 20
 	// for idx, batch := range batches {

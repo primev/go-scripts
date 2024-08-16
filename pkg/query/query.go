@@ -12,7 +12,7 @@ import (
 	vr "github.com/primevprotocol/validator-registry/pkg/validatorregistry"
 )
 
-func GetAllStakedValsFromNewRegistry() ([]string, error) {
+func GetAllStakedValsFromRegistry() ([]string, error) {
 	client, err := ethclient.Dial("https://ethereum-holesky-rpc.publicnode.com")
 	if err != nil {
 		log.Fatalf("Failed to create eth client: %v", err)

@@ -150,7 +150,7 @@ func main() {
 		delete(e, event.ValBLSPubKey)
 	}
 
-	stakedVals, err := query.GetAllStakedValsFromNewRegistry()
+	stakedVals, err := query.GetAllStakedValsFromRegistry()
 	if err != nil {
 		log.Fatalf("Failed to get all staked validators: %v", err)
 	}

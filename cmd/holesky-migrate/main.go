@@ -10,15 +10,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/events"
 	"github.com/primevprotocol/validator-registry/pkg/query"
 	"github.com/primevprotocol/validator-registry/pkg/utils"
+	optinrouter "github.com/primevprotocol/validator-registry/pkg/validatoroptinrouter"
 	vrv1 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1"
 	vrv1_aug15 "github.com/primevprotocol/validator-registry/pkg/validatorregistryv1_aug15"
 )
@@ -87,19 +90,7 @@ func main() {
 		log.Fatalf("failed to get auth: %v", err)
 	}
 	tOpts.From = account.Address
-	nonce, err := client.PendingNonceAt(context.Background(), account.Address)
-	if err != nil {
-		log.Fatalf("failed to get pending nonce: %v", err)
-	}
-	tOpts.Nonce = big.NewInt(int64(nonce))
-
-	gasTip, gasPrice, err := SuggestGasTipCapAndPrice(context.Background(), client)
-	if err != nil {
-		log.Fatalf("failed to suggest gas tip cap and price: %v", err)
-	}
-	tOpts.GasFeeCap = gasPrice
-	tOpts.GasTipCap = gasTip
-	tOpts.GasLimit = 300000
+	tOpts.GasLimit = 10000000
 
 	balance, err := client.BalanceAt(context.Background(), account.Address, nil)
 	if err != nil {
@@ -121,6 +112,21 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry aug15 transactor: %v", err)
 	}
 
+	optInRouterAddr := common.HexToAddress("0xF3e5E8eB71f821D299EFf0E826a50A95589eD043")
+	vRouter, err := optinrouter.NewValidatoroptinrouterCaller(optInRouterAddr, client)
+	if err != nil {
+		log.Fatalf("Failed to create Validator Registry aug15 caller: %v", err)
+	}
+
+	valRegV1Obtained, err := vRouter.ValidatorRegistryV1(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		log.Fatalf("Failed to get validator registry v1 address from router: %v", err)
+	}
+	if valRegV1Obtained != newValRegAddr {
+		log.Fatalf("validator registry v1 address in router doesn't match expected address %v, got %v",
+			newValRegAddr.Hex(), valRegV1Obtained.Hex())
+	}
+
 	ec := utils.NewETHClient(client)
 	// ec.CancelPendingTxes(context.Background(), privateKey)
 
@@ -131,8 +137,9 @@ func main() {
 	fmt.Println("Current block: ", currentBlock.NumberU64())
 
 	// // obtain events from old registry, in batches of 50000
+	// start at block 1700000 (before contract deployment)
 	totEvents := make(map[string]events.Event)
-	for i := 0; i < int(currentBlock.NumberU64()); i += 50000 {
+	for i := 1700000; i < int(currentBlock.NumberU64()); i += 50000 {
 		start := uint64(i)
 		end := uint64(i + 50000)
 		if end > currentBlock.NumberU64() {
@@ -177,7 +184,7 @@ func main() {
 		stakedValidatorsMap[validator] = true
 	}
 
-	// delete events from vals that are not in stakedValidators
+	// delete events from vals that are not in stakedValidators from old reg
 	deletedFromStaked := 0
 	for _, event := range totEvents {
 		if !stakedValidatorsMap[event.ValBLSPubKey] {
@@ -187,13 +194,57 @@ func main() {
 	}
 	fmt.Println("Number of events deleted from staked validators: ", deletedFromStaked)
 
+	// delete events for vals that are already staked in new reg
+	batchSize := 1000
+	var keysToDelete []string
+	keys := make([]string, 0, len(totEvents))
+	for key := range totEvents {
+		keys = append(keys, key)
+	}
+
+	for i := 0; i < len(keys); i += batchSize {
+		end := i + batchSize
+		if end > len(keys) {
+			end = len(keys)
+		}
+
+		batch := make([][]byte, 0, batchSize)
+		batchKeys := keys[i:end]
+
+		for _, key := range batchKeys {
+			pubKeyBytes, err := hex.DecodeString(key)
+			if err != nil {
+				log.Printf("Failed to decode pubkey %s: %v", key, err)
+				continue
+			}
+			batch = append(batch, pubKeyBytes)
+		}
+
+		areStaked, err := vRouter.AreValidatorsOptedIn(&bind.CallOpts{Context: context.Background()}, batch)
+		if err != nil {
+			log.Fatalf("Failed to check if validators are opted in: %v", err)
+		}
+
+		for j, isStaked := range areStaked {
+			if isStaked {
+				keysToDelete = append(keysToDelete, batchKeys[j])
+			}
+		}
+		fmt.Println("keysToDelete len this round: ", len(keysToDelete))
+	}
+
+	for _, key := range keysToDelete {
+		delete(totEvents, key)
+	}
+	fmt.Printf("Number of events deleted for validators already staked in new reg: %d\n", len(keysToDelete))
+
 	numEvents := 0
-	for _, event := range totEvents {
+	for _, _ = range totEvents {
 		numEvents++
-		fmt.Println(event.TxOriginator)
-		fmt.Println(event.ValBLSPubKey)
-		fmt.Println(event.Amount)
-		fmt.Println("-------------------")
+		// fmt.Println(event.TxOriginator)
+		// fmt.Println(event.ValBLSPubKey)
+		// fmt.Println(event.Amount)
+		// fmt.Println("-------------------")
 	}
 	fmt.Println("Number of events to act upon: ", numEvents)
 
@@ -234,11 +285,23 @@ func main() {
 			totalAmount := new(big.Int).Mul(amountPerValidator, big.NewInt(int64(len(subBatch))))
 			tOpts.Value = totalAmount
 
+			nonce, err := client.PendingNonceAt(context.Background(), account.Address)
+			if err != nil {
+				log.Fatalf("failed to get pending nonce: %v", err)
+			}
+			tOpts.Nonce = big.NewInt(int64(nonce))
+
+			gasTip, gasPrice, err := SuggestGasTipCapAndPrice(context.Background(), client)
+			if err != nil {
+				log.Fatalf("failed to suggest gas tip cap and price: %v", err)
+			}
+			tOpts.GasFeeCap = gasPrice
+			tOpts.GasTipCap = gasTip
+
 			submitTx := func(
 				ctx context.Context,
 				opts *bind.TransactOpts,
 			) (*types.Transaction, error) {
-
 				tx, err := vrta15.DelegateStake(opts, subBatch, batch.stakeOriginator)
 				if err != nil {
 					return nil, fmt.Errorf("failed to stake: %w", err)
@@ -258,9 +321,16 @@ func main() {
 			}
 			fmt.Println("DelegateStake tx included in block: ", receipt.BlockNumber)
 
-			if receipt.Status == 0 {
-				fmt.Println("DelegateStake tx included, but failed. Exiting...")
-				os.Exit(1)
+			if receipt.Status != ethtypes.ReceiptStatusSuccessful {
+				revertReason := getRevertReason(context.Background(), receipt, client)
+				fmt.Printf("Transaction failed. Receipt status: %d, Revert reason: %s\n", receipt.Status, revertReason)
+				fmt.Printf("Stake originator: %s\n", batch.stakeOriginator.Hex())
+				fmt.Printf("Number of validators in this batch: %d\n", len(subBatch))
+				for _, pubKey := range subBatch {
+					fmt.Printf("Validator pubkey: %x\n", pubKey)
+				}
+				fmt.Printf("Total amount staked: %s wei\n", tOpts.Value.String())
+				continue
 			}
 
 			fmt.Println("-------------------")
@@ -285,4 +355,27 @@ func SuggestGasTipCapAndPrice(ctx context.Context, client *ethclient.Client) (
 		return nil, nil, fmt.Errorf("failed to get gas price: %w", err)
 	}
 	return gasTip, gasPrice, nil
+}
+
+func getRevertReason(ctx context.Context, receipt *types.Receipt, client *ethclient.Client) string {
+	tx, _, err := client.TransactionByHash(ctx, receipt.TxHash)
+	if err != nil {
+		return fmt.Sprintf("failed to get transaction: %v", err)
+	}
+
+	msg := ethereum.CallMsg{
+		From:     common.HexToAddress("0x4535bd6fF24860b5fd2889857651a85fb3d3C6b1"),
+		To:       tx.To(),
+		Gas:      tx.Gas(),
+		GasPrice: tx.GasPrice(),
+		Value:    tx.Value(),
+		Data:     tx.Data(),
+	}
+
+	result, err := client.CallContract(ctx, msg, receipt.BlockNumber)
+	if err != nil {
+		return fmt.Sprintf("Revert reason: %v", err)
+	}
+
+	return fmt.Sprintf("No error, but transaction failed. Result: %x", result)
 }

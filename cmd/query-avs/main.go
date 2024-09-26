@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/primevprotocol/validator-registry/pkg/mevcommitavs"
+	"github.com/primevprotocol/validator-registry/pkg/mevcommitavsv3"
 )
 
 func main() {
@@ -26,12 +26,10 @@ func main() {
 
 	mevCommitAVSAddress := common.HexToAddress("0xededb8ed37a43fd399108a44646b85b780d85dd4")
 
-	avsFilterer, err := mevcommitavs.NewMevcommitavsFilterer(mevCommitAVSAddress, client)
+	avsFilterer, err := mevcommitavsv3.NewMevcommitavsv3Filterer(mevCommitAVSAddress, client)
 	if err != nil {
 		log.Fatalf("Failed to create Validator Registry caller: %v", err)
 	}
-
-	podOwner := common.HexToAddress("0x90dC8493CF3676C46A5Df49B9febD891C0161AFD")
 
 	// Get the latest block number
 	latestBlock, err := client.BlockNumber(context.Background())
@@ -54,7 +52,7 @@ func main() {
 			Context: context.Background(),
 		}
 
-		events, err := avsFilterer.FilterValidatorRegistered(opts, nil, []common.Address{podOwner})
+		events, err := avsFilterer.FilterValidatorRegistered(opts, nil)
 		if err != nil {
 			log.Fatalf("Failed to filter Validator Registered events for blocks %d to %d: %v", startBlock, endBlock, err)
 		}
@@ -62,7 +60,7 @@ func main() {
 		for events.Next() {
 			fmt.Printf("Block: %d, Validator PubKey: %s, Pod Owner: %s\n",
 				events.Event.Raw.BlockNumber,
-				events.Event.ValidatorPubKey,
+				common.Bytes2Hex(events.Event.ValidatorPubKey[:]),
 				events.Event.PodOwner)
 		}
 

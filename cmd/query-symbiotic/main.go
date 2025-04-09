@@ -55,7 +55,7 @@ func main() {
 		}
 		for operators.Next() {
 			operator := operators.Event.Operator
-			fmt.Println("Operator: ", operator.Hex())
+			fmt.Println("Operator: ", operator.Hex(), "Registered in tx hash: ", operators.Event.Raw.TxHash.Hex())
 		}
 		if err := operators.Error(); err != nil {
 			log.Fatalf("Failed to iterate through registered operators: %v", err)
@@ -79,7 +79,7 @@ func main() {
 		}
 		for vaults.Next() {
 			vault := vaults.Event.Vault
-			fmt.Println("Vault: ", vault.Hex())
+			fmt.Println("Vault: ", vault.Hex(), "Registered in tx hash: ", vaults.Event.Raw.TxHash.Hex())
 		}
 		if err := vaults.Error(); err != nil {
 			log.Fatalf("Failed to iterate through registered vaults: %v", err)

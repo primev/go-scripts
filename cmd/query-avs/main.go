@@ -54,7 +54,7 @@ func main() {
 			Context: context.Background(),
 		}
 
-		events, err := avsFilterer.FilterValidatorRegistered(opts, nil, []common.Address{podOwner})
+		events, err := avsFilterer.FilterValidatorRegistered(opts, []common.Address{podOwner})
 		if err != nil {
 			log.Fatalf("Failed to filter Validator Registered events for blocks %d to %d: %v", startBlock, endBlock, err)
 		}

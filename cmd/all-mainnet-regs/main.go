@@ -71,10 +71,9 @@ func main() {
 	}
 
 	batchSize := uint64(50000)
-	startBlock := uint64(21950000) // TODO: revisit start block
+	startBlock := uint64(20000000) // TODO: revisit start block
 
-	idx := 0
-	optedInValidators := make([]optedInValidator, 10000)
+	optedInValidators := make([]optedInValidator, 0, 1000)
 
 	for startBlock <= latestBlock {
 		fmt.Printf("Processing blocks %d to %d\n", startBlock, startBlock+batchSize-1)
@@ -95,12 +94,11 @@ func main() {
 		}
 
 		for events.Next() {
-			optedInValidators[idx] = optedInValidator{
+			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:     events.Event.ValidatorPubKey,
 				optInBlock: events.Event.Raw.BlockNumber,
 				podOwner:   events.Event.PodOwner,
-			}
-			idx++
+			})
 		}
 
 		middlewareEvents, err := middlewareFilterer.FilterValRecordAdded(opts, nil, nil, nil)
@@ -109,13 +107,12 @@ func main() {
 		}
 
 		for middlewareEvents.Next() {
-			optedInValidators[idx] = optedInValidator{
+			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:     middlewareEvents.Event.BlsPubkey,
 				optInBlock: middlewareEvents.Event.Raw.BlockNumber,
 				vault:      middlewareEvents.Event.Vault,
 				operator:   middlewareEvents.Event.Operator,
-			}
-			idx++
+			})
 		}
 
 		vanillaEvents, err := vanillaFilterer.FilterStaked(opts, nil, nil)
@@ -124,12 +121,11 @@ func main() {
 		}
 
 		for vanillaEvents.Next() {
-			optedInValidators[idx] = optedInValidator{
+			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:         vanillaEvents.Event.ValBLSPubKey,
 				optInBlock:     vanillaEvents.Event.Raw.BlockNumber,
 				withdrawalAddr: vanillaEvents.Event.WithdrawalAddress,
-			}
-			idx++
+			})
 		}
 
 		startBlock = endBlock + 1

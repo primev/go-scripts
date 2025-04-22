@@ -74,7 +74,7 @@ func main() {
 	}
 
 	batchSize := uint64(50000)
-	startBlock := uint64(21950000) // TODO: revisit start block
+	startBlock := uint64(21162202) // deployment block
 
 	optedInValidators := make([]optedInValidator, 0, 1000)
 

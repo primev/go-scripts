@@ -12,8 +12,18 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/mevcommitavs"
 	"github.com/primevprotocol/validator-registry/pkg/mevcommitmiddleware"
+	"github.com/primevprotocol/validator-registry/pkg/validatoroptinrouter"
 	"github.com/primevprotocol/validator-registry/pkg/vanillaregistry"
 )
+
+type optedInValidator struct {
+	pubKey         []byte
+	optInBlock     uint64
+	podOwner       common.Address
+	vault          common.Address
+	operator       common.Address
+	withdrawalAddr common.Address
+}
 
 func main() {
 
@@ -48,11 +58,11 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry caller: %v", err)
 	}
 
-	// validatorOptInRouterAddress := common.HexToAddress("0x821798d7b9d57dF7Ed7616ef9111A616aB19ed64")
-	// routerCaller, err := validatoroptinrouter.NewValidatoroptinrouterCaller(validatorOptInRouterAddress, client)
-	// if err != nil {
-	// 	log.Fatalf("Failed to create Validator Registry caller: %v", err)
-	// }
+	validatorOptInRouterAddress := common.HexToAddress("0x821798d7b9d57dF7Ed7616ef9111A616aB19ed64")
+	routerCaller, err := validatoroptinrouter.NewValidatoroptinrouterCaller(validatorOptInRouterAddress, client)
+	if err != nil {
+		log.Fatalf("Failed to create Validator Registry caller: %v", err)
+	}
 
 	// Get the latest block number
 	latestBlock, err := client.BlockNumber(context.Background())
@@ -61,9 +71,10 @@ func main() {
 	}
 
 	batchSize := uint64(50000)
-	startBlock := uint64(20000000) // TODO: revisit start block
+	startBlock := uint64(21950000) // TODO: revisit start block
 
-	totalOptIns := 0
+	idx := 0
+	optedInValidators := make([]optedInValidator, 10000)
 
 	for startBlock <= latestBlock {
 		fmt.Printf("Processing blocks %d to %d\n", startBlock, startBlock+batchSize-1)
@@ -84,11 +95,12 @@ func main() {
 		}
 
 		for events.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Pod Owner: %s\n",
-				events.Event.Raw.BlockNumber,
-				hex.EncodeToString(events.Event.ValidatorPubKey),
-				events.Event.PodOwner)
-			totalOptIns++
+			optedInValidators[idx] = optedInValidator{
+				pubKey:     events.Event.ValidatorPubKey,
+				optInBlock: events.Event.Raw.BlockNumber,
+				podOwner:   events.Event.PodOwner,
+			}
+			idx++
 		}
 
 		middlewareEvents, err := middlewareFilterer.FilterValRecordAdded(opts, nil, nil, nil)
@@ -97,13 +109,13 @@ func main() {
 		}
 
 		for middlewareEvents.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Vault: %s, Operator: %s\n",
-				middlewareEvents.Event.Raw.BlockNumber,
-				hex.EncodeToString(middlewareEvents.Event.BlsPubkey),
-				middlewareEvents.Event.Vault,
-				middlewareEvents.Event.Operator,
-			)
-			totalOptIns++
+			optedInValidators[idx] = optedInValidator{
+				pubKey:     middlewareEvents.Event.BlsPubkey,
+				optInBlock: middlewareEvents.Event.Raw.BlockNumber,
+				vault:      middlewareEvents.Event.Vault,
+				operator:   middlewareEvents.Event.Operator,
+			}
+			idx++
 		}
 
 		vanillaEvents, err := vanillaFilterer.FilterStaked(opts, nil, nil)
@@ -112,22 +124,39 @@ func main() {
 		}
 
 		for vanillaEvents.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Withdrawal Address: %s\n",
-				vanillaEvents.Event.Raw.BlockNumber,
-				hex.EncodeToString(vanillaEvents.Event.ValBLSPubKey),
-				vanillaEvents.Event.WithdrawalAddress,
-			)
-			totalOptIns++
+			optedInValidators[idx] = optedInValidator{
+				pubKey:         vanillaEvents.Event.ValBLSPubKey,
+				optInBlock:     vanillaEvents.Event.Raw.BlockNumber,
+				withdrawalAddr: vanillaEvents.Event.WithdrawalAddress,
+			}
+			idx++
 		}
 
 		startBlock = endBlock + 1
 	}
 
-	// isOptedIn, err := routerCaller.AreValidatorsOptedIn(nil, [][]byte{vanillaEvents.Event.ValBLSPubKey})
-	// if err != nil {
-	// 	log.Fatalf("Failed to check if validators are opted in: %v", err)
-	// }
-	// fmt.Printf("Is Opted In: %t\n", isOptedIn)
-
-	fmt.Printf("Total opt ins: %d\n", totalOptIns)
+	batchSizeLatter := 50
+	for i := 0; i < len(optedInValidators); i += batchSizeLatter {
+		end := i + batchSizeLatter
+		if end > len(optedInValidators) {
+			end = len(optedInValidators)
+		}
+		batch := make([][]byte, 0)
+		for _, validator := range optedInValidators[i:end] {
+			batch = append(batch, validator.pubKey)
+		}
+		isOptedIn, err := routerCaller.AreValidatorsOptedIn(nil, batch)
+		if err != nil {
+			log.Fatalf("Failed to check if validators are opted in: %v", err)
+		}
+		for idxValidator := range optedInValidators[i:end] {
+			if isOptedIn[idxValidator].IsAvsOptedIn ||
+				isOptedIn[idxValidator].IsMiddlewareOptedIn ||
+				isOptedIn[idxValidator].IsVanillaOptedIn {
+				fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
+			} else {
+				fmt.Printf("Val pubkey %s is not opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
+			}
+		}
+	}
 }

@@ -51,12 +51,18 @@ func main() {
 
 	errGroup, ctx := errgroup.WithContext(context.Background())
 
-	oneFourth := (endEpoch - startEpoch) / 4
+	oneTenth := (endEpoch - startEpoch) / 10
 	ranges := [][]uint64{
-		{startEpoch, startEpoch + oneFourth},
-		{startEpoch + oneFourth + 1, startEpoch + 2*oneFourth},
-		{startEpoch + 2*oneFourth + 1, startEpoch + 3*oneFourth},
-		{startEpoch + 3*oneFourth + 1, endEpoch},
+		{startEpoch, startEpoch + oneTenth},
+		{startEpoch + oneTenth + 1, startEpoch + 2*oneTenth},
+		{startEpoch + 2*oneTenth + 1, startEpoch + 3*oneTenth},
+		{startEpoch + 3*oneTenth + 1, startEpoch + 4*oneTenth},
+		{startEpoch + 4*oneTenth + 1, startEpoch + 5*oneTenth},
+		{startEpoch + 5*oneTenth + 1, startEpoch + 6*oneTenth},
+		{startEpoch + 6*oneTenth + 1, startEpoch + 7*oneTenth},
+		{startEpoch + 7*oneTenth + 1, startEpoch + 8*oneTenth},
+		{startEpoch + 8*oneTenth + 1, startEpoch + 9*oneTenth},
+		{startEpoch + 9*oneTenth + 1, endEpoch},
 	}
 
 	m := sync.Mutex{}

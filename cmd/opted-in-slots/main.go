@@ -41,47 +41,23 @@ func main() {
 		log.Fatalf("Failed to load validators from CSV: %v", err)
 	}
 
-	startEpoch := uint64(335000) // TODO: Followup on start/end
+	startEpoch := uint64(335000) // TODO: Followup on start/end to save run time!
 	endEpoch := uint64(360607)
 
-	apiURL := "https://ethereum-beacon-api.publicnode.com"
+	apiURL := trimApiURL("https://ethereum-beacon-api.publicnode.com")
 
-	apiURL = strings.TrimSuffix(apiURL, "/")
-
-	optedInSlots := []optedInSlot{}
-
-	for epoch := startEpoch; epoch <= endEpoch; epoch++ {
-		start := time.Now()
-		duties, err := fetchProposerDuties(context.Background(), epoch, apiURL)
-		if err != nil {
-			log.Fatalf("Failed to fetch proposer duties: %v", err)
-		}
-		for _, duty := range duties.Data {
-			validator, ok := validators[duty.Pubkey]
-			if ok {
-				fmt.Printf("Opted-in validator %s is proposer for epoch %d and slot %s\n", validator.pubKey, epoch, duty.Slot)
-				slot, err := strconv.ParseUint(duty.Slot, 10, 64)
-				if err != nil {
-					log.Fatalf("Failed to parse slot: %v", err)
-				}
-				blockNumber, err := getBlockNumberForSlot(context.Background(), slot, apiURL)
-				if err != nil {
-					log.Fatalf("Failed to get block number for slot: %v", err)
-				}
-				fmt.Printf("Block number for slot %s: %d\n", duty.Slot, blockNumber)
-				if blockNumber >= validator.optInBlock {
-					optedInSlots = append(optedInSlots, optedInSlot{
-						slot:             slot,
-						blockNumber:      blockNumber,
-						optedInValidator: validator,
-					})
-					fmt.Println(optedInSlots)
-					panic("stop here for now. Then export to csv")
-				}
-			}
-		}
-		fmt.Printf("Time taken for epoch %d: %v\n", epoch, time.Since(start))
+	optedInSlots, err := queryForOptedInSlots(context.Background(), startEpoch, endEpoch, apiURL, validators)
+	if err != nil {
+		log.Fatalf("Failed to query for opted-in slots: %v", err)
 	}
+	fmt.Printf("Found %d opted-in slots\n", len(optedInSlots))
+
+	// TODO: export to csv
+	// TODO: parallelize, use backup / multiple public rpc(s) if necessary. Would currently take 14 hours to run. Private RPC is even slower.
+}
+
+func trimApiURL(apiURL string) string {
+	return strings.TrimSuffix(apiURL, "/")
 }
 
 func loadValidatorsFromCSV() (map[string]optedInValidator, error) {
@@ -227,4 +203,47 @@ func getBlockNumberForSlot(ctx context.Context, slot uint64, apiURL string) (
 	}
 
 	return blockNumber, nil
+}
+
+func queryForOptedInSlots(
+	ctx context.Context,
+	startEpoch uint64,
+	endEpoch uint64,
+	apiURL string,
+	validators map[string]optedInValidator,
+) ([]optedInSlot, error) {
+
+	optedInSlots := []optedInSlot{}
+	for epoch := startEpoch; epoch <= endEpoch; epoch++ {
+		start := time.Now()
+		duties, err := fetchProposerDuties(ctx, epoch, apiURL)
+		if err != nil {
+			log.Fatalf("Failed to fetch proposer duties: %v", err)
+		}
+		for _, duty := range duties.Data {
+			pubkey := strings.TrimPrefix(duty.Pubkey, "0x")
+			validator, ok := validators[pubkey]
+			if ok {
+				slot, err := strconv.ParseUint(duty.Slot, 10, 64)
+				if err != nil {
+					log.Fatalf("Failed to parse slot: %v", err)
+				}
+				blockNumber, err := getBlockNumberForSlot(ctx, slot, apiURL)
+				if err != nil {
+					log.Fatalf("Failed to get block number for slot: %v", err)
+				}
+				if blockNumber >= validator.optInBlock {
+					optedInSlots = append(optedInSlots, optedInSlot{
+						slot:             slot,
+						blockNumber:      blockNumber,
+						optedInValidator: validator,
+					})
+					fmt.Printf("Found opted-in slot. Slot number: %d, block number: %d, pubkey: %s\n",
+						slot, blockNumber, validator.pubKey)
+				}
+			}
+		}
+		fmt.Printf("Time taken for epoch %d: %v\n", epoch, time.Since(start))
+	}
+	return optedInSlots, nil
 }

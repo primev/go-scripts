@@ -2,18 +2,32 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
+	"os"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/primevprotocol/validator-registry/pkg/mevcommitavs"
 	"github.com/primevprotocol/validator-registry/pkg/mevcommitmiddleware"
+	"github.com/primevprotocol/validator-registry/pkg/validatoroptinrouter"
 	"github.com/primevprotocol/validator-registry/pkg/vanillaregistry"
 )
+
+type optedInValidator struct {
+	pubKey         []byte
+	optInType      string
+	optInBlock     uint64
+	podOwner       common.Address
+	vault          common.Address
+	operator       common.Address
+	withdrawalAddr common.Address
+}
 
 func main() {
 
@@ -48,22 +62,21 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry caller: %v", err)
 	}
 
-	// validatorOptInRouterAddress := common.HexToAddress("0x821798d7b9d57dF7Ed7616ef9111A616aB19ed64")
-	// routerCaller, err := validatoroptinrouter.NewValidatoroptinrouterCaller(validatorOptInRouterAddress, client)
-	// if err != nil {
-	// 	log.Fatalf("Failed to create Validator Registry caller: %v", err)
-	// }
+	validatorOptInRouterAddress := common.HexToAddress("0x821798d7b9d57dF7Ed7616ef9111A616aB19ed64")
+	routerCaller, err := validatoroptinrouter.NewValidatoroptinrouterCaller(validatorOptInRouterAddress, client)
+	if err != nil {
+		log.Fatalf("Failed to create Validator Registry caller: %v", err)
+	}
 
-	// Get the latest block number
 	latestBlock, err := client.BlockNumber(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to get latest block number: %v", err)
 	}
 
 	batchSize := uint64(50000)
-	startBlock := uint64(20000000) // TODO: revisit start block
+	startBlock := uint64(21950000) // TODO: revisit start block
 
-	totalOptIns := 0
+	optedInValidators := make([]optedInValidator, 0, 1000)
 
 	for startBlock <= latestBlock {
 		fmt.Printf("Processing blocks %d to %d\n", startBlock, startBlock+batchSize-1)
@@ -84,11 +97,12 @@ func main() {
 		}
 
 		for events.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Pod Owner: %s\n",
-				events.Event.Raw.BlockNumber,
-				hex.EncodeToString(events.Event.ValidatorPubKey),
-				events.Event.PodOwner)
-			totalOptIns++
+			optedInValidators = append(optedInValidators, optedInValidator{
+				pubKey:     events.Event.ValidatorPubKey,
+				optInType:  "Eigen",
+				optInBlock: events.Event.Raw.BlockNumber,
+				podOwner:   events.Event.PodOwner,
+			})
 		}
 
 		middlewareEvents, err := middlewareFilterer.FilterValRecordAdded(opts, nil, nil, nil)
@@ -97,13 +111,13 @@ func main() {
 		}
 
 		for middlewareEvents.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Vault: %s, Operator: %s\n",
-				middlewareEvents.Event.Raw.BlockNumber,
-				hex.EncodeToString(middlewareEvents.Event.BlsPubkey),
-				middlewareEvents.Event.Vault,
-				middlewareEvents.Event.Operator,
-			)
-			totalOptIns++
+			optedInValidators = append(optedInValidators, optedInValidator{
+				pubKey:     middlewareEvents.Event.BlsPubkey,
+				optInType:  "Symbiotic",
+				optInBlock: middlewareEvents.Event.Raw.BlockNumber,
+				vault:      middlewareEvents.Event.Vault,
+				operator:   middlewareEvents.Event.Operator,
+			})
 		}
 
 		vanillaEvents, err := vanillaFilterer.FilterStaked(opts, nil, nil)
@@ -112,22 +126,75 @@ func main() {
 		}
 
 		for vanillaEvents.Next() {
-			fmt.Printf("Block: %d, Validator PubKey: %s, Withdrawal Address: %s\n",
-				vanillaEvents.Event.Raw.BlockNumber,
-				hex.EncodeToString(vanillaEvents.Event.ValBLSPubKey),
-				vanillaEvents.Event.WithdrawalAddress,
-			)
-			totalOptIns++
+			optedInValidators = append(optedInValidators, optedInValidator{
+				pubKey:         vanillaEvents.Event.ValBLSPubKey,
+				optInType:      "Vanilla",
+				optInBlock:     vanillaEvents.Event.Raw.BlockNumber,
+				withdrawalAddr: vanillaEvents.Event.WithdrawalAddress,
+			})
 		}
 
 		startBlock = endBlock + 1
 	}
+	sanityCheckAgainstRouter(optedInValidators, routerCaller)
+	exportToCsv(optedInValidators)
+}
 
-	// isOptedIn, err := routerCaller.AreValidatorsOptedIn(nil, [][]byte{vanillaEvents.Event.ValBLSPubKey})
-	// if err != nil {
-	// 	log.Fatalf("Failed to check if validators are opted in: %v", err)
-	// }
-	// fmt.Printf("Is Opted In: %t\n", isOptedIn)
+func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller *validatoroptinrouter.ValidatoroptinrouterCaller) {
+	batchSize := 50
+	for i := 0; i < len(optedInValidators); i += batchSize {
+		end := i + batchSize
+		fmt.Printf("Checking batch %d to %d against router\n", i, end)
+		if end > len(optedInValidators) {
+			end = len(optedInValidators)
+		}
+		batch := make([][]byte, 0)
+		for _, validator := range optedInValidators[i:end] {
+			batch = append(batch, validator.pubKey)
+		}
+		isOptedIn, err := routerCaller.AreValidatorsOptedIn(nil, batch)
+		if err != nil {
+			log.Fatalf("Failed to check if validators are opted in: %v", err)
+		}
+		for idxValidator := range optedInValidators[i:end] {
+			if isOptedIn[idxValidator].IsAvsOptedIn ||
+				isOptedIn[idxValidator].IsMiddlewareOptedIn ||
+				isOptedIn[idxValidator].IsVanillaOptedIn {
+				fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
+			} else {
+				panic(fmt.Sprintf("Val pubkey %s is not opted in", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey)))
+			}
+		}
+	}
+}
 
-	fmt.Printf("Total opt ins: %d\n", totalOptIns)
+func exportToCsv(optedInValidators []optedInValidator) {
+	fmt.Printf("Exporting %d opted in validators to csv\n", len(optedInValidators))
+	csvFile, err := os.Create("opted_in_validators.csv")
+	if err != nil {
+		log.Fatalf("Failed to create CSV file: %v", err)
+	}
+	defer csvFile.Close()
+
+	sort.Slice(optedInValidators, func(i, j int) bool {
+		return optedInValidators[i].optInBlock < optedInValidators[j].optInBlock
+	})
+
+	writer := csv.NewWriter(csvFile)
+	writer.Write([]string{"pubKey", "optInBlock", "podOwner", "vault", "operator", "withdrawalAddr"})
+	for _, validator := range optedInValidators {
+		writer.Write([]string{
+			hex.EncodeToString(validator.pubKey),
+			fmt.Sprintf("%d", validator.optInBlock),
+			validator.podOwner.Hex(),
+			validator.vault.Hex(),
+			validator.operator.Hex(),
+			validator.withdrawalAddr.Hex(),
+		})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		log.Fatalf("Failed to write CSV file: %v", err)
+	}
+	fmt.Printf("Exported %d opted in validators to csv\n", len(optedInValidators))
 }

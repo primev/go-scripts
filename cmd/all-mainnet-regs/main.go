@@ -160,7 +160,7 @@ func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller
 			if isOptedIn[idxValidator].IsAvsOptedIn ||
 				isOptedIn[idxValidator].IsMiddlewareOptedIn ||
 				isOptedIn[idxValidator].IsVanillaOptedIn {
-				fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
+				// fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
 			} else {
 				panic(fmt.Sprintf("Val pubkey %s is not opted in", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey)))
 			}

@@ -45,7 +45,7 @@ func main() {
 	}
 
 	startEpoch := uint64(348700) // https://beaconcha.in/epoch/348700 from Feb-27-2025 22:40:23 UTC-8
-	endEpoch := uint64(349200)   // TODO: update to latest
+	endEpoch := uint64(360736)   // latest as of Apr-22-2025 11:30:47 UTC-7
 
 	apiURL := trimApiURL("https://ethereum-beacon-api.publicnode.com")
 

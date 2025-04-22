@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -41,19 +44,42 @@ func main() {
 		log.Fatalf("Failed to load validators from CSV: %v", err)
 	}
 
-	startEpoch := uint64(335000) // TODO: Followup on start/end to save run time!
-	endEpoch := uint64(360607)
+	startEpoch := uint64(348700) // https://beaconcha.in/epoch/348700 from Feb-27-2025 22:40:23 UTC-8
+	endEpoch := uint64(349200)   // TODO: update to latest
 
 	apiURL := trimApiURL("https://ethereum-beacon-api.publicnode.com")
 
-	optedInSlots, err := queryForOptedInSlots(context.Background(), startEpoch, endEpoch, apiURL, validators)
-	if err != nil {
+	errGroup, ctx := errgroup.WithContext(context.Background())
+
+	oneFourth := (endEpoch - startEpoch) / 4
+	ranges := [][]uint64{
+		{startEpoch, startEpoch + oneFourth},
+		{startEpoch + oneFourth + 1, startEpoch + 2*oneFourth},
+		{startEpoch + 2*oneFourth + 1, startEpoch + 3*oneFourth},
+		{startEpoch + 3*oneFourth + 1, endEpoch},
+	}
+
+	m := sync.Mutex{}
+	optedInSlots := []optedInSlot{}
+
+	for _, r := range ranges {
+		errGroup.Go(func() error {
+			slots, err := queryForOptedInSlots(ctx, r[0], r[1], apiURL, validators)
+			if err != nil {
+				return err
+			}
+			m.Lock()
+			optedInSlots = append(optedInSlots, slots...)
+			m.Unlock()
+			return nil
+		})
+	}
+
+	if err := errGroup.Wait(); err != nil {
 		log.Fatalf("Failed to query for opted-in slots: %v", err)
 	}
-	fmt.Printf("Found %d opted-in slots\n", len(optedInSlots))
 
-	// TODO: export to csv
-	// TODO: parallelize, use backup / multiple public rpc(s) if necessary. Would currently take 14 hours to run. Private RPC is even slower.
+	exportToCsv(optedInSlots)
 }
 
 func trimApiURL(apiURL string) string {
@@ -246,4 +272,38 @@ func queryForOptedInSlots(
 		fmt.Printf("Time taken for epoch %d: %v\n", epoch, time.Since(start))
 	}
 	return optedInSlots, nil
+}
+
+func exportToCsv(optedInSlots []optedInSlot) {
+	fmt.Printf("Exporting %d opted-in slots to csv\n", len(optedInSlots))
+	csvFile, err := os.Create("opted_in_slots.csv")
+	if err != nil {
+		log.Fatalf("Failed to create CSV file: %v", err)
+	}
+	defer csvFile.Close()
+
+	sort.Slice(optedInSlots, func(i, j int) bool {
+		return optedInSlots[i].optedInValidator.optInBlock < optedInSlots[j].optedInValidator.optInBlock
+	})
+
+	writer := csv.NewWriter(csvFile)
+	writer.Write([]string{"slot", "blockNumber", "pubKey", "optInBlock", "optInType", "podOwner", "vault", "operator", "withdrawalAddr"})
+	for _, slot := range optedInSlots {
+		writer.Write([]string{
+			fmt.Sprintf("%d", slot.slot),
+			fmt.Sprintf("%d", slot.blockNumber),
+			slot.optedInValidator.pubKey,
+			fmt.Sprintf("%d", slot.optedInValidator.optInBlock),
+			slot.optedInValidator.optInType,
+			slot.optedInValidator.podOwner.Hex(),
+			slot.optedInValidator.vault.Hex(),
+			slot.optedInValidator.operator.Hex(),
+			slot.optedInValidator.withdrawalAddr.Hex(),
+		})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		log.Fatalf("Failed to write CSV file: %v", err)
+	}
+	fmt.Printf("Exported %d opted-in slots to csv\n", len(optedInSlots))
 }

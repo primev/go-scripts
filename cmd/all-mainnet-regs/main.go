@@ -181,11 +181,12 @@ func exportToCsv(optedInValidators []optedInValidator) {
 	})
 
 	writer := csv.NewWriter(csvFile)
-	writer.Write([]string{"pubKey", "optInBlock", "podOwner", "vault", "operator", "withdrawalAddr"})
+	writer.Write([]string{"pubKey", "optInBlock", "optInType", "podOwner", "vault", "operator", "withdrawalAddr"})
 	for _, validator := range optedInValidators {
 		writer.Write([]string{
 			hex.EncodeToString(validator.pubKey),
 			fmt.Sprintf("%d", validator.optInBlock),
+			validator.optInType,
 			validator.podOwner.Hex(),
 			validator.vault.Hex(),
 			validator.operator.Hex(),

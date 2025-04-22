@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
+	"os"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +21,7 @@ import (
 
 type optedInValidator struct {
 	pubKey         []byte
+	optInType      string
 	optInBlock     uint64
 	podOwner       common.Address
 	vault          common.Address
@@ -64,14 +68,13 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry caller: %v", err)
 	}
 
-	// Get the latest block number
 	latestBlock, err := client.BlockNumber(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to get latest block number: %v", err)
 	}
 
 	batchSize := uint64(50000)
-	startBlock := uint64(20000000) // TODO: revisit start block
+	startBlock := uint64(21950000) // TODO: revisit start block
 
 	optedInValidators := make([]optedInValidator, 0, 1000)
 
@@ -96,6 +99,7 @@ func main() {
 		for events.Next() {
 			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:     events.Event.ValidatorPubKey,
+				optInType:  "Eigen",
 				optInBlock: events.Event.Raw.BlockNumber,
 				podOwner:   events.Event.PodOwner,
 			})
@@ -109,6 +113,7 @@ func main() {
 		for middlewareEvents.Next() {
 			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:     middlewareEvents.Event.BlsPubkey,
+				optInType:  "Symbiotic",
 				optInBlock: middlewareEvents.Event.Raw.BlockNumber,
 				vault:      middlewareEvents.Event.Vault,
 				operator:   middlewareEvents.Event.Operator,
@@ -123,6 +128,7 @@ func main() {
 		for vanillaEvents.Next() {
 			optedInValidators = append(optedInValidators, optedInValidator{
 				pubKey:         vanillaEvents.Event.ValBLSPubKey,
+				optInType:      "Vanilla",
 				optInBlock:     vanillaEvents.Event.Raw.BlockNumber,
 				withdrawalAddr: vanillaEvents.Event.WithdrawalAddress,
 			})
@@ -130,10 +136,15 @@ func main() {
 
 		startBlock = endBlock + 1
 	}
+	sanityCheckAgainstRouter(optedInValidators, routerCaller)
+	exportToCsv(optedInValidators)
+}
 
-	batchSizeLatter := 50
-	for i := 0; i < len(optedInValidators); i += batchSizeLatter {
-		end := i + batchSizeLatter
+func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller *validatoroptinrouter.ValidatoroptinrouterCaller) {
+	batchSize := 50
+	for i := 0; i < len(optedInValidators); i += batchSize {
+		end := i + batchSize
+		fmt.Printf("Checking batch %d to %d against router\n", i, end)
 		if end > len(optedInValidators) {
 			end = len(optedInValidators)
 		}
@@ -151,8 +162,39 @@ func main() {
 				isOptedIn[idxValidator].IsVanillaOptedIn {
 				fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
 			} else {
-				fmt.Printf("Val pubkey %s is not opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
+				panic(fmt.Sprintf("Val pubkey %s is not opted in", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey)))
 			}
 		}
 	}
+}
+
+func exportToCsv(optedInValidators []optedInValidator) {
+	fmt.Printf("Exporting %d opted in validators to csv\n", len(optedInValidators))
+	csvFile, err := os.Create("opted_in_validators.csv")
+	if err != nil {
+		log.Fatalf("Failed to create CSV file: %v", err)
+	}
+	defer csvFile.Close()
+
+	sort.Slice(optedInValidators, func(i, j int) bool {
+		return optedInValidators[i].optInBlock < optedInValidators[j].optInBlock
+	})
+
+	writer := csv.NewWriter(csvFile)
+	writer.Write([]string{"pubKey", "optInBlock", "podOwner", "vault", "operator", "withdrawalAddr"})
+	for _, validator := range optedInValidators {
+		writer.Write([]string{
+			hex.EncodeToString(validator.pubKey),
+			fmt.Sprintf("%d", validator.optInBlock),
+			validator.podOwner.Hex(),
+			validator.vault.Hex(),
+			validator.operator.Hex(),
+			validator.withdrawalAddr.Hex(),
+		})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		log.Fatalf("Failed to write CSV file: %v", err)
+	}
+	fmt.Printf("Exported %d opted in validators to csv\n", len(optedInValidators))
 }

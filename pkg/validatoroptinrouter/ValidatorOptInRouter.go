@@ -29,9 +29,16 @@ var (
 	_ = abi.ConvertType
 )
 
+// IValidatorOptInRouterOptInStatus is an auto generated low-level Go binding around an user-defined struct.
+type IValidatorOptInRouterOptInStatus struct {
+	IsVanillaOptedIn    bool
+	IsAvsOptedIn        bool
+	IsMiddlewareOptedIn bool
+}
+
 // ValidatoroptinrouterMetaData contains all meta data concerning the Validatoroptinrouter contract.
 var ValidatoroptinrouterMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"fallback\",\"stateMutability\":\"payable\"},{\"type\":\"receive\",\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"UPGRADE_INTERFACE_VERSION\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"areValidatorsOptedIn\",\"inputs\":[{\"name\":\"valBLSPubKeys\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool[]\",\"internalType\":\"bool[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_validatorRegistry\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_mevCommitAVS\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_owner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"mevCommitAVS\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIMevCommitAVS\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingOwner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"proxiableUUID\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMevCommitAVS\",\"inputs\":[{\"name\":\"_mevCommitAVS\",\"type\":\"address\",\"internalType\":\"contractIMevCommitAVS\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setValidatorRegistryV1\",\"inputs\":[{\"name\":\"_validatorRegistry\",\"type\":\"address\",\"internalType\":\"contractIValidatorRegistryV1\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"upgradeToAndCall\",\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"validatorRegistryV1\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIValidatorRegistryV1\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MevCommitAVSSet\",\"inputs\":[{\"name\":\"oldContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferStarted\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Upgraded\",\"inputs\":[{\"name\":\"implementation\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ValidatorRegistryV1Set\",\"inputs\":[{\"name\":\"oldContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressEmptyCode\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ERC1967InvalidImplementation\",\"inputs\":[{\"name\":\"implementation\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ERC1967NonPayable\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"FailedInnerCall\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidFallback\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidInitialization\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidReceive\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotInitializing\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnableInvalidOwner\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OwnableUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UUPSUnauthorizedCallContext\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UUPSUnsupportedProxiableUUID\",\"inputs\":[{\"name\":\"slot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"fallback\",\"stateMutability\":\"payable\"},{\"type\":\"receive\",\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"UPGRADE_INTERFACE_VERSION\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"areValidatorsOptedIn\",\"inputs\":[{\"name\":\"valBLSPubKeys\",\"type\":\"bytes[]\",\"internalType\":\"bytes[]\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple[]\",\"internalType\":\"structIValidatorOptInRouter.OptInStatus[]\",\"components\":[{\"name\":\"isVanillaOptedIn\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"isAvsOptedIn\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"isMiddlewareOptedIn\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_vanillaRegistry\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_mevCommitAVS\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_mevCommitMiddleware\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_owner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"mevCommitAVS\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIMevCommitAVS\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"mevCommitMiddleware\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIMevCommitMiddleware\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingOwner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"proxiableUUID\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMevCommitAVS\",\"inputs\":[{\"name\":\"_mevCommitAVS\",\"type\":\"address\",\"internalType\":\"contractIMevCommitAVS\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMevCommitMiddleware\",\"inputs\":[{\"name\":\"_mevCommitMiddleware\",\"type\":\"address\",\"internalType\":\"contractIMevCommitMiddleware\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setVanillaRegistry\",\"inputs\":[{\"name\":\"_vanillaRegistry\",\"type\":\"address\",\"internalType\":\"contractIVanillaRegistry\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"upgradeToAndCall\",\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"vanillaRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIVanillaRegistry\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MevCommitAVSSet\",\"inputs\":[{\"name\":\"oldContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MevCommitMiddlewareSet\",\"inputs\":[{\"name\":\"oldContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferStarted\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Upgraded\",\"inputs\":[{\"name\":\"implementation\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VanillaRegistrySet\",\"inputs\":[{\"name\":\"oldContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"},{\"name\":\"newContract\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressEmptyCode\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ERC1967InvalidImplementation\",\"inputs\":[{\"name\":\"implementation\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ERC1967NonPayable\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"FailedInnerCall\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidFallback\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidInitialization\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidReceive\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NotInitializing\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnableInvalidOwner\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OwnableUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"UUPSUnauthorizedCallContext\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"UUPSUnsupportedProxiableUUID\",\"inputs\":[{\"name\":\"slot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]}]",
 }
 
 // ValidatoroptinrouterABI is the input ABI used to generate the binding from.
@@ -213,16 +220,16 @@ func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) UPGRADEINTERFACE
 
 // AreValidatorsOptedIn is a free data retrieval call binding the contract method 0x5b88b173.
 //
-// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns(bool[])
-func (_Validatoroptinrouter *ValidatoroptinrouterCaller) AreValidatorsOptedIn(opts *bind.CallOpts, valBLSPubKeys [][]byte) ([]bool, error) {
+// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns((bool,bool,bool)[])
+func (_Validatoroptinrouter *ValidatoroptinrouterCaller) AreValidatorsOptedIn(opts *bind.CallOpts, valBLSPubKeys [][]byte) ([]IValidatorOptInRouterOptInStatus, error) {
 	var out []interface{}
 	err := _Validatoroptinrouter.contract.Call(opts, &out, "areValidatorsOptedIn", valBLSPubKeys)
 
 	if err != nil {
-		return *new([]bool), err
+		return *new([]IValidatorOptInRouterOptInStatus), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new([]bool)).(*[]bool)
+	out0 := *abi.ConvertType(out[0], new([]IValidatorOptInRouterOptInStatus)).(*[]IValidatorOptInRouterOptInStatus)
 
 	return out0, err
 
@@ -230,15 +237,15 @@ func (_Validatoroptinrouter *ValidatoroptinrouterCaller) AreValidatorsOptedIn(op
 
 // AreValidatorsOptedIn is a free data retrieval call binding the contract method 0x5b88b173.
 //
-// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns(bool[])
-func (_Validatoroptinrouter *ValidatoroptinrouterSession) AreValidatorsOptedIn(valBLSPubKeys [][]byte) ([]bool, error) {
+// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns((bool,bool,bool)[])
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) AreValidatorsOptedIn(valBLSPubKeys [][]byte) ([]IValidatorOptInRouterOptInStatus, error) {
 	return _Validatoroptinrouter.Contract.AreValidatorsOptedIn(&_Validatoroptinrouter.CallOpts, valBLSPubKeys)
 }
 
 // AreValidatorsOptedIn is a free data retrieval call binding the contract method 0x5b88b173.
 //
-// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns(bool[])
-func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) AreValidatorsOptedIn(valBLSPubKeys [][]byte) ([]bool, error) {
+// Solidity: function areValidatorsOptedIn(bytes[] valBLSPubKeys) view returns((bool,bool,bool)[])
+func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) AreValidatorsOptedIn(valBLSPubKeys [][]byte) ([]IValidatorOptInRouterOptInStatus, error) {
 	return _Validatoroptinrouter.Contract.AreValidatorsOptedIn(&_Validatoroptinrouter.CallOpts, valBLSPubKeys)
 }
 
@@ -271,6 +278,37 @@ func (_Validatoroptinrouter *ValidatoroptinrouterSession) MevCommitAVS() (common
 // Solidity: function mevCommitAVS() view returns(address)
 func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) MevCommitAVS() (common.Address, error) {
 	return _Validatoroptinrouter.Contract.MevCommitAVS(&_Validatoroptinrouter.CallOpts)
+}
+
+// MevCommitMiddleware is a free data retrieval call binding the contract method 0x0113568e.
+//
+// Solidity: function mevCommitMiddleware() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterCaller) MevCommitMiddleware(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _Validatoroptinrouter.contract.Call(opts, &out, "mevCommitMiddleware")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// MevCommitMiddleware is a free data retrieval call binding the contract method 0x0113568e.
+//
+// Solidity: function mevCommitMiddleware() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) MevCommitMiddleware() (common.Address, error) {
+	return _Validatoroptinrouter.Contract.MevCommitMiddleware(&_Validatoroptinrouter.CallOpts)
+}
+
+// MevCommitMiddleware is a free data retrieval call binding the contract method 0x0113568e.
+//
+// Solidity: function mevCommitMiddleware() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) MevCommitMiddleware() (common.Address, error) {
+	return _Validatoroptinrouter.Contract.MevCommitMiddleware(&_Validatoroptinrouter.CallOpts)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -366,12 +404,12 @@ func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) ProxiableUUID() 
 	return _Validatoroptinrouter.Contract.ProxiableUUID(&_Validatoroptinrouter.CallOpts)
 }
 
-// ValidatorRegistryV1 is a free data retrieval call binding the contract method 0xa0c3cf38.
+// VanillaRegistry is a free data retrieval call binding the contract method 0x6dfade9e.
 //
-// Solidity: function validatorRegistryV1() view returns(address)
-func (_Validatoroptinrouter *ValidatoroptinrouterCaller) ValidatorRegistryV1(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function vanillaRegistry() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterCaller) VanillaRegistry(opts *bind.CallOpts) (common.Address, error) {
 	var out []interface{}
-	err := _Validatoroptinrouter.contract.Call(opts, &out, "validatorRegistryV1")
+	err := _Validatoroptinrouter.contract.Call(opts, &out, "vanillaRegistry")
 
 	if err != nil {
 		return *new(common.Address), err
@@ -383,18 +421,18 @@ func (_Validatoroptinrouter *ValidatoroptinrouterCaller) ValidatorRegistryV1(opt
 
 }
 
-// ValidatorRegistryV1 is a free data retrieval call binding the contract method 0xa0c3cf38.
+// VanillaRegistry is a free data retrieval call binding the contract method 0x6dfade9e.
 //
-// Solidity: function validatorRegistryV1() view returns(address)
-func (_Validatoroptinrouter *ValidatoroptinrouterSession) ValidatorRegistryV1() (common.Address, error) {
-	return _Validatoroptinrouter.Contract.ValidatorRegistryV1(&_Validatoroptinrouter.CallOpts)
+// Solidity: function vanillaRegistry() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) VanillaRegistry() (common.Address, error) {
+	return _Validatoroptinrouter.Contract.VanillaRegistry(&_Validatoroptinrouter.CallOpts)
 }
 
-// ValidatorRegistryV1 is a free data retrieval call binding the contract method 0xa0c3cf38.
+// VanillaRegistry is a free data retrieval call binding the contract method 0x6dfade9e.
 //
-// Solidity: function validatorRegistryV1() view returns(address)
-func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) ValidatorRegistryV1() (common.Address, error) {
-	return _Validatoroptinrouter.Contract.ValidatorRegistryV1(&_Validatoroptinrouter.CallOpts)
+// Solidity: function vanillaRegistry() view returns(address)
+func (_Validatoroptinrouter *ValidatoroptinrouterCallerSession) VanillaRegistry() (common.Address, error) {
+	return _Validatoroptinrouter.Contract.VanillaRegistry(&_Validatoroptinrouter.CallOpts)
 }
 
 // AcceptOwnership is a paid mutator transaction binding the contract method 0x79ba5097.
@@ -418,25 +456,25 @@ func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) AcceptOwners
 	return _Validatoroptinrouter.Contract.AcceptOwnership(&_Validatoroptinrouter.TransactOpts)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc0c53b8b.
+// Initialize is a paid mutator transaction binding the contract method 0xf8c8765e.
 //
-// Solidity: function initialize(address _validatorRegistry, address _mevCommitAVS, address _owner) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterTransactor) Initialize(opts *bind.TransactOpts, _validatorRegistry common.Address, _mevCommitAVS common.Address, _owner common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.contract.Transact(opts, "initialize", _validatorRegistry, _mevCommitAVS, _owner)
+// Solidity: function initialize(address _vanillaRegistry, address _mevCommitAVS, address _mevCommitMiddleware, address _owner) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactor) Initialize(opts *bind.TransactOpts, _vanillaRegistry common.Address, _mevCommitAVS common.Address, _mevCommitMiddleware common.Address, _owner common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.contract.Transact(opts, "initialize", _vanillaRegistry, _mevCommitAVS, _mevCommitMiddleware, _owner)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc0c53b8b.
+// Initialize is a paid mutator transaction binding the contract method 0xf8c8765e.
 //
-// Solidity: function initialize(address _validatorRegistry, address _mevCommitAVS, address _owner) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterSession) Initialize(_validatorRegistry common.Address, _mevCommitAVS common.Address, _owner common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.Contract.Initialize(&_Validatoroptinrouter.TransactOpts, _validatorRegistry, _mevCommitAVS, _owner)
+// Solidity: function initialize(address _vanillaRegistry, address _mevCommitAVS, address _mevCommitMiddleware, address _owner) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) Initialize(_vanillaRegistry common.Address, _mevCommitAVS common.Address, _mevCommitMiddleware common.Address, _owner common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.Initialize(&_Validatoroptinrouter.TransactOpts, _vanillaRegistry, _mevCommitAVS, _mevCommitMiddleware, _owner)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc0c53b8b.
+// Initialize is a paid mutator transaction binding the contract method 0xf8c8765e.
 //
-// Solidity: function initialize(address _validatorRegistry, address _mevCommitAVS, address _owner) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) Initialize(_validatorRegistry common.Address, _mevCommitAVS common.Address, _owner common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.Contract.Initialize(&_Validatoroptinrouter.TransactOpts, _validatorRegistry, _mevCommitAVS, _owner)
+// Solidity: function initialize(address _vanillaRegistry, address _mevCommitAVS, address _mevCommitMiddleware, address _owner) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) Initialize(_vanillaRegistry common.Address, _mevCommitAVS common.Address, _mevCommitMiddleware common.Address, _owner common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.Initialize(&_Validatoroptinrouter.TransactOpts, _vanillaRegistry, _mevCommitAVS, _mevCommitMiddleware, _owner)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -481,25 +519,46 @@ func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) SetMevCommit
 	return _Validatoroptinrouter.Contract.SetMevCommitAVS(&_Validatoroptinrouter.TransactOpts, _mevCommitAVS)
 }
 
-// SetValidatorRegistryV1 is a paid mutator transaction binding the contract method 0x5605282e.
+// SetMevCommitMiddleware is a paid mutator transaction binding the contract method 0xab746a6a.
 //
-// Solidity: function setValidatorRegistryV1(address _validatorRegistry) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterTransactor) SetValidatorRegistryV1(opts *bind.TransactOpts, _validatorRegistry common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.contract.Transact(opts, "setValidatorRegistryV1", _validatorRegistry)
+// Solidity: function setMevCommitMiddleware(address _mevCommitMiddleware) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactor) SetMevCommitMiddleware(opts *bind.TransactOpts, _mevCommitMiddleware common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.contract.Transact(opts, "setMevCommitMiddleware", _mevCommitMiddleware)
 }
 
-// SetValidatorRegistryV1 is a paid mutator transaction binding the contract method 0x5605282e.
+// SetMevCommitMiddleware is a paid mutator transaction binding the contract method 0xab746a6a.
 //
-// Solidity: function setValidatorRegistryV1(address _validatorRegistry) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterSession) SetValidatorRegistryV1(_validatorRegistry common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.Contract.SetValidatorRegistryV1(&_Validatoroptinrouter.TransactOpts, _validatorRegistry)
+// Solidity: function setMevCommitMiddleware(address _mevCommitMiddleware) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) SetMevCommitMiddleware(_mevCommitMiddleware common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.SetMevCommitMiddleware(&_Validatoroptinrouter.TransactOpts, _mevCommitMiddleware)
 }
 
-// SetValidatorRegistryV1 is a paid mutator transaction binding the contract method 0x5605282e.
+// SetMevCommitMiddleware is a paid mutator transaction binding the contract method 0xab746a6a.
 //
-// Solidity: function setValidatorRegistryV1(address _validatorRegistry) returns()
-func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) SetValidatorRegistryV1(_validatorRegistry common.Address) (*types.Transaction, error) {
-	return _Validatoroptinrouter.Contract.SetValidatorRegistryV1(&_Validatoroptinrouter.TransactOpts, _validatorRegistry)
+// Solidity: function setMevCommitMiddleware(address _mevCommitMiddleware) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) SetMevCommitMiddleware(_mevCommitMiddleware common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.SetMevCommitMiddleware(&_Validatoroptinrouter.TransactOpts, _mevCommitMiddleware)
+}
+
+// SetVanillaRegistry is a paid mutator transaction binding the contract method 0xf99a9e82.
+//
+// Solidity: function setVanillaRegistry(address _vanillaRegistry) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactor) SetVanillaRegistry(opts *bind.TransactOpts, _vanillaRegistry common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.contract.Transact(opts, "setVanillaRegistry", _vanillaRegistry)
+}
+
+// SetVanillaRegistry is a paid mutator transaction binding the contract method 0xf99a9e82.
+//
+// Solidity: function setVanillaRegistry(address _vanillaRegistry) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterSession) SetVanillaRegistry(_vanillaRegistry common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.SetVanillaRegistry(&_Validatoroptinrouter.TransactOpts, _vanillaRegistry)
+}
+
+// SetVanillaRegistry is a paid mutator transaction binding the contract method 0xf99a9e82.
+//
+// Solidity: function setVanillaRegistry(address _vanillaRegistry) returns()
+func (_Validatoroptinrouter *ValidatoroptinrouterTransactorSession) SetVanillaRegistry(_vanillaRegistry common.Address) (*types.Transaction, error) {
+	return _Validatoroptinrouter.Contract.SetVanillaRegistry(&_Validatoroptinrouter.TransactOpts, _vanillaRegistry)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -849,6 +908,141 @@ func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchMevCommitAVSSet(
 func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) ParseMevCommitAVSSet(log types.Log) (*ValidatoroptinrouterMevCommitAVSSet, error) {
 	event := new(ValidatoroptinrouterMevCommitAVSSet)
 	if err := _Validatoroptinrouter.contract.UnpackLog(event, "MevCommitAVSSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// ValidatoroptinrouterMevCommitMiddlewareSetIterator is returned from FilterMevCommitMiddlewareSet and is used to iterate over the raw logs and unpacked data for MevCommitMiddlewareSet events raised by the Validatoroptinrouter contract.
+type ValidatoroptinrouterMevCommitMiddlewareSetIterator struct {
+	Event *ValidatoroptinrouterMevCommitMiddlewareSet // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *ValidatoroptinrouterMevCommitMiddlewareSetIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(ValidatoroptinrouterMevCommitMiddlewareSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(ValidatoroptinrouterMevCommitMiddlewareSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *ValidatoroptinrouterMevCommitMiddlewareSetIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *ValidatoroptinrouterMevCommitMiddlewareSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// ValidatoroptinrouterMevCommitMiddlewareSet represents a MevCommitMiddlewareSet event raised by the Validatoroptinrouter contract.
+type ValidatoroptinrouterMevCommitMiddlewareSet struct {
+	OldContract common.Address
+	NewContract common.Address
+	Raw         types.Log // Blockchain specific contextual infos
+}
+
+// FilterMevCommitMiddlewareSet is a free log retrieval operation binding the contract event 0x18f3e437693c56abc46f48593ce0bcf104a0f3ccf07c4192ae0eb324214584c6.
+//
+// Solidity: event MevCommitMiddlewareSet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) FilterMevCommitMiddlewareSet(opts *bind.FilterOpts) (*ValidatoroptinrouterMevCommitMiddlewareSetIterator, error) {
+
+	logs, sub, err := _Validatoroptinrouter.contract.FilterLogs(opts, "MevCommitMiddlewareSet")
+	if err != nil {
+		return nil, err
+	}
+	return &ValidatoroptinrouterMevCommitMiddlewareSetIterator{contract: _Validatoroptinrouter.contract, event: "MevCommitMiddlewareSet", logs: logs, sub: sub}, nil
+}
+
+// WatchMevCommitMiddlewareSet is a free log subscription operation binding the contract event 0x18f3e437693c56abc46f48593ce0bcf104a0f3ccf07c4192ae0eb324214584c6.
+//
+// Solidity: event MevCommitMiddlewareSet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchMevCommitMiddlewareSet(opts *bind.WatchOpts, sink chan<- *ValidatoroptinrouterMevCommitMiddlewareSet) (event.Subscription, error) {
+
+	logs, sub, err := _Validatoroptinrouter.contract.WatchLogs(opts, "MevCommitMiddlewareSet")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(ValidatoroptinrouterMevCommitMiddlewareSet)
+				if err := _Validatoroptinrouter.contract.UnpackLog(event, "MevCommitMiddlewareSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseMevCommitMiddlewareSet is a log parse operation binding the contract event 0x18f3e437693c56abc46f48593ce0bcf104a0f3ccf07c4192ae0eb324214584c6.
+//
+// Solidity: event MevCommitMiddlewareSet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) ParseMevCommitMiddlewareSet(log types.Log) (*ValidatoroptinrouterMevCommitMiddlewareSet, error) {
+	event := new(ValidatoroptinrouterMevCommitMiddlewareSet)
+	if err := _Validatoroptinrouter.contract.UnpackLog(event, "MevCommitMiddlewareSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1305,9 +1499,9 @@ func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) ParseUpgraded(log typ
 	return event, nil
 }
 
-// ValidatoroptinrouterValidatorRegistryV1SetIterator is returned from FilterValidatorRegistryV1Set and is used to iterate over the raw logs and unpacked data for ValidatorRegistryV1Set events raised by the Validatoroptinrouter contract.
-type ValidatoroptinrouterValidatorRegistryV1SetIterator struct {
-	Event *ValidatoroptinrouterValidatorRegistryV1Set // Event containing the contract specifics and raw log
+// ValidatoroptinrouterVanillaRegistrySetIterator is returned from FilterVanillaRegistrySet and is used to iterate over the raw logs and unpacked data for VanillaRegistrySet events raised by the Validatoroptinrouter contract.
+type ValidatoroptinrouterVanillaRegistrySetIterator struct {
+	Event *ValidatoroptinrouterVanillaRegistrySet // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -1321,7 +1515,7 @@ type ValidatoroptinrouterValidatorRegistryV1SetIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Next() bool {
+func (it *ValidatoroptinrouterVanillaRegistrySetIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -1330,7 +1524,7 @@ func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(ValidatoroptinrouterValidatorRegistryV1Set)
+			it.Event = new(ValidatoroptinrouterVanillaRegistrySet)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -1345,7 +1539,7 @@ func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(ValidatoroptinrouterValidatorRegistryV1Set)
+		it.Event = new(ValidatoroptinrouterVanillaRegistrySet)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -1361,42 +1555,42 @@ func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Error() error {
+func (it *ValidatoroptinrouterVanillaRegistrySetIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *ValidatoroptinrouterValidatorRegistryV1SetIterator) Close() error {
+func (it *ValidatoroptinrouterVanillaRegistrySetIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// ValidatoroptinrouterValidatorRegistryV1Set represents a ValidatorRegistryV1Set event raised by the Validatoroptinrouter contract.
-type ValidatoroptinrouterValidatorRegistryV1Set struct {
+// ValidatoroptinrouterVanillaRegistrySet represents a VanillaRegistrySet event raised by the Validatoroptinrouter contract.
+type ValidatoroptinrouterVanillaRegistrySet struct {
 	OldContract common.Address
 	NewContract common.Address
 	Raw         types.Log // Blockchain specific contextual infos
 }
 
-// FilterValidatorRegistryV1Set is a free log retrieval operation binding the contract event 0x797d2b493f5b527eeb691c6b2fc743152c6df95318aecce8e12918fde52c5fe2.
+// FilterVanillaRegistrySet is a free log retrieval operation binding the contract event 0x3f45fe29af7577363f9fe5c59df3712e84086c072bd5fca14a1c76230b19c667.
 //
-// Solidity: event ValidatorRegistryV1Set(address oldContract, address newContract)
-func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) FilterValidatorRegistryV1Set(opts *bind.FilterOpts) (*ValidatoroptinrouterValidatorRegistryV1SetIterator, error) {
+// Solidity: event VanillaRegistrySet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) FilterVanillaRegistrySet(opts *bind.FilterOpts) (*ValidatoroptinrouterVanillaRegistrySetIterator, error) {
 
-	logs, sub, err := _Validatoroptinrouter.contract.FilterLogs(opts, "ValidatorRegistryV1Set")
+	logs, sub, err := _Validatoroptinrouter.contract.FilterLogs(opts, "VanillaRegistrySet")
 	if err != nil {
 		return nil, err
 	}
-	return &ValidatoroptinrouterValidatorRegistryV1SetIterator{contract: _Validatoroptinrouter.contract, event: "ValidatorRegistryV1Set", logs: logs, sub: sub}, nil
+	return &ValidatoroptinrouterVanillaRegistrySetIterator{contract: _Validatoroptinrouter.contract, event: "VanillaRegistrySet", logs: logs, sub: sub}, nil
 }
 
-// WatchValidatorRegistryV1Set is a free log subscription operation binding the contract event 0x797d2b493f5b527eeb691c6b2fc743152c6df95318aecce8e12918fde52c5fe2.
+// WatchVanillaRegistrySet is a free log subscription operation binding the contract event 0x3f45fe29af7577363f9fe5c59df3712e84086c072bd5fca14a1c76230b19c667.
 //
-// Solidity: event ValidatorRegistryV1Set(address oldContract, address newContract)
-func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchValidatorRegistryV1Set(opts *bind.WatchOpts, sink chan<- *ValidatoroptinrouterValidatorRegistryV1Set) (event.Subscription, error) {
+// Solidity: event VanillaRegistrySet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchVanillaRegistrySet(opts *bind.WatchOpts, sink chan<- *ValidatoroptinrouterVanillaRegistrySet) (event.Subscription, error) {
 
-	logs, sub, err := _Validatoroptinrouter.contract.WatchLogs(opts, "ValidatorRegistryV1Set")
+	logs, sub, err := _Validatoroptinrouter.contract.WatchLogs(opts, "VanillaRegistrySet")
 	if err != nil {
 		return nil, err
 	}
@@ -1406,8 +1600,8 @@ func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchValidatorRegistr
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(ValidatoroptinrouterValidatorRegistryV1Set)
-				if err := _Validatoroptinrouter.contract.UnpackLog(event, "ValidatorRegistryV1Set", log); err != nil {
+				event := new(ValidatoroptinrouterVanillaRegistrySet)
+				if err := _Validatoroptinrouter.contract.UnpackLog(event, "VanillaRegistrySet", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -1428,12 +1622,12 @@ func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) WatchValidatorRegistr
 	}), nil
 }
 
-// ParseValidatorRegistryV1Set is a log parse operation binding the contract event 0x797d2b493f5b527eeb691c6b2fc743152c6df95318aecce8e12918fde52c5fe2.
+// ParseVanillaRegistrySet is a log parse operation binding the contract event 0x3f45fe29af7577363f9fe5c59df3712e84086c072bd5fca14a1c76230b19c667.
 //
-// Solidity: event ValidatorRegistryV1Set(address oldContract, address newContract)
-func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) ParseValidatorRegistryV1Set(log types.Log) (*ValidatoroptinrouterValidatorRegistryV1Set, error) {
-	event := new(ValidatoroptinrouterValidatorRegistryV1Set)
-	if err := _Validatoroptinrouter.contract.UnpackLog(event, "ValidatorRegistryV1Set", log); err != nil {
+// Solidity: event VanillaRegistrySet(address oldContract, address newContract)
+func (_Validatoroptinrouter *ValidatoroptinrouterFilterer) ParseVanillaRegistrySet(log types.Log) (*ValidatoroptinrouterVanillaRegistrySet, error) {
+	event := new(ValidatoroptinrouterVanillaRegistrySet)
+	if err := _Validatoroptinrouter.contract.UnpackLog(event, "VanillaRegistrySet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log

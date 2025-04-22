@@ -118,7 +118,7 @@ func main() {
 		log.Fatalf("Failed to create Validator Registry aug15 caller: %v", err)
 	}
 
-	valRegV1Obtained, err := vRouter.ValidatorRegistryV1(&bind.CallOpts{Context: context.Background()})
+	valRegV1Obtained, err := vRouter.VanillaRegistry(&bind.CallOpts{Context: context.Background()})
 	if err != nil {
 		log.Fatalf("Failed to get validator registry v1 address from router: %v", err)
 	}
@@ -219,18 +219,6 @@ func main() {
 			}
 			batch = append(batch, pubKeyBytes)
 		}
-
-		areStaked, err := vRouter.AreValidatorsOptedIn(&bind.CallOpts{Context: context.Background()}, batch)
-		if err != nil {
-			log.Fatalf("Failed to check if validators are opted in: %v", err)
-		}
-
-		for j, isStaked := range areStaked {
-			if isStaked {
-				keysToDelete = append(keysToDelete, batchKeys[j])
-			}
-		}
-		fmt.Println("keysToDelete len this round: ", len(keysToDelete))
 	}
 
 	for _, key := range keysToDelete {

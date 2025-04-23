@@ -62,14 +62,14 @@ func main() {
 	fmt.Printf("Loaded %d opened commits from Sentio\n", len(openedCommits))
 
 	for blockNumber, slot := range optedInSlots {
-		if commit, ok := openedCommits[blockNumber]; ok {
-			fmt.Printf("Not missed: %d %d\n", slot.slot, commit.BlockNumber)
+		if _, ok := openedCommits[blockNumber]; ok {
 			slot.missed = false
 		} else {
-			fmt.Printf("Missed: %d %d\n", slot.slot, blockNumber)
 			slot.missed = true
 		}
 	}
+
+	fmt.Printf("Writing %d slots to CSV\n", len(optedInSlots))
 
 	err = writeToCsv(optedInSlots)
 	if err != nil {
@@ -207,5 +207,6 @@ func writeToCsv(optedInSlots map[uint64]*optedInSlot) error {
 			fmt.Sprintf("%t", slot.missed),
 		})
 	}
+	writer.Flush()
 	return nil
 }

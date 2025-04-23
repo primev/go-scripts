@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -191,9 +192,17 @@ func writeToCsv(optedInSlots map[uint64]*optedInSlot) error {
 	}
 	defer file.Close()
 
+	toWrite := []*optedInSlot{}
+	for _, slot := range optedInSlots {
+		toWrite = append(toWrite, slot)
+	}
+	sort.Slice(toWrite, func(i, j int) bool {
+		return toWrite[i].optInBlock < toWrite[j].optInBlock
+	})
+
 	writer := csv.NewWriter(file)
 	writer.Write([]string{"slot", "blockNumber", "pubKey", "optInBlock", "optInType", "podOwner", "vault", "operator", "withdrawalAddr", "missed"})
-	for _, slot := range optedInSlots {
+	for _, slot := range toWrite {
 		writer.Write([]string{
 			fmt.Sprintf("%d", slot.slot),
 			fmt.Sprintf("%d", slot.blockNumber),

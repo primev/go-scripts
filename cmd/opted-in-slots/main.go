@@ -51,18 +51,38 @@ func main() {
 
 	errGroup, ctx := errgroup.WithContext(context.Background())
 
-	oneTenth := (endEpoch - startEpoch) / 10
+	oneThirtyth := (endEpoch - startEpoch) / 30
 	ranges := [][]uint64{
-		{startEpoch, startEpoch + oneTenth},
-		{startEpoch + oneTenth + 1, startEpoch + 2*oneTenth},
-		{startEpoch + 2*oneTenth + 1, startEpoch + 3*oneTenth},
-		{startEpoch + 3*oneTenth + 1, startEpoch + 4*oneTenth},
-		{startEpoch + 4*oneTenth + 1, startEpoch + 5*oneTenth},
-		{startEpoch + 5*oneTenth + 1, startEpoch + 6*oneTenth},
-		{startEpoch + 6*oneTenth + 1, startEpoch + 7*oneTenth},
-		{startEpoch + 7*oneTenth + 1, startEpoch + 8*oneTenth},
-		{startEpoch + 8*oneTenth + 1, startEpoch + 9*oneTenth},
-		{startEpoch + 9*oneTenth + 1, endEpoch},
+		{startEpoch, startEpoch + oneThirtyth},
+		{startEpoch + oneThirtyth + 1, startEpoch + 2*oneThirtyth},
+		{startEpoch + 2*oneThirtyth + 1, startEpoch + 3*oneThirtyth},
+		{startEpoch + 3*oneThirtyth + 1, startEpoch + 4*oneThirtyth},
+		{startEpoch + 4*oneThirtyth + 1, startEpoch + 5*oneThirtyth},
+		{startEpoch + 5*oneThirtyth + 1, startEpoch + 6*oneThirtyth},
+		{startEpoch + 6*oneThirtyth + 1, startEpoch + 7*oneThirtyth},
+		{startEpoch + 7*oneThirtyth + 1, startEpoch + 8*oneThirtyth},
+		{startEpoch + 8*oneThirtyth + 1, startEpoch + 9*oneThirtyth},
+		{startEpoch + 9*oneThirtyth + 1, startEpoch + 10*oneThirtyth},
+		{startEpoch + 10*oneThirtyth + 1, startEpoch + 11*oneThirtyth},
+		{startEpoch + 11*oneThirtyth + 1, startEpoch + 12*oneThirtyth},
+		{startEpoch + 12*oneThirtyth + 1, startEpoch + 13*oneThirtyth},
+		{startEpoch + 13*oneThirtyth + 1, startEpoch + 14*oneThirtyth},
+		{startEpoch + 14*oneThirtyth + 1, startEpoch + 15*oneThirtyth},
+		{startEpoch + 15*oneThirtyth + 1, startEpoch + 16*oneThirtyth},
+		{startEpoch + 16*oneThirtyth + 1, startEpoch + 17*oneThirtyth},
+		{startEpoch + 17*oneThirtyth + 1, startEpoch + 18*oneThirtyth},
+		{startEpoch + 18*oneThirtyth + 1, startEpoch + 19*oneThirtyth},
+		{startEpoch + 19*oneThirtyth + 1, startEpoch + 20*oneThirtyth},
+		{startEpoch + 20*oneThirtyth + 1, startEpoch + 21*oneThirtyth},
+		{startEpoch + 21*oneThirtyth + 1, startEpoch + 22*oneThirtyth},
+		{startEpoch + 22*oneThirtyth + 1, startEpoch + 23*oneThirtyth},
+		{startEpoch + 23*oneThirtyth + 1, startEpoch + 24*oneThirtyth},
+		{startEpoch + 24*oneThirtyth + 1, startEpoch + 25*oneThirtyth},
+		{startEpoch + 25*oneThirtyth + 1, startEpoch + 26*oneThirtyth},
+		{startEpoch + 26*oneThirtyth + 1, startEpoch + 27*oneThirtyth},
+		{startEpoch + 27*oneThirtyth + 1, startEpoch + 28*oneThirtyth},
+		{startEpoch + 28*oneThirtyth + 1, startEpoch + 29*oneThirtyth},
+		{startEpoch + 29*oneThirtyth + 1, endEpoch},
 	}
 
 	m := sync.Mutex{}
@@ -149,7 +169,6 @@ type ProposerDutiesResponse struct {
 }
 
 func fetchProposerDuties(ctx context.Context, epoch uint64, apiURL string) (*ProposerDutiesResponse, error) {
-	fmt.Printf("Fetching proposer duties for epoch %d\n", epoch)
 	url := fmt.Sprintf("%s/eth/v1/validator/duties/proposer/%d", apiURL, epoch)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -248,9 +267,21 @@ func queryForOptedInSlots(
 	optedInSlots := []optedInSlot{}
 	for epoch := startEpoch; epoch <= endEpoch; epoch++ {
 		start := time.Now()
-		duties, err := fetchProposerDuties(ctx, epoch, apiURL)
-		if err != nil {
-			log.Fatalf("Failed to fetch proposer duties: %v", err)
+		fmt.Printf("Fetching proposer duties for epoch %d. Epochs left for this worker: %d\n", epoch, endEpoch-epoch)
+
+		var duties *ProposerDutiesResponse
+		var err error
+		for retries := 0; retries < 5; retries++ {
+			duties, err = fetchProposerDuties(ctx, epoch, apiURL)
+			if err != nil {
+				fmt.Printf("Failed to fetch proposer duties: %v\n", err)
+				if retries == 4 {
+					log.Fatalf("Failed to fetch proposer duties: %v", err)
+				}
+			} else {
+				break
+			}
+			time.Sleep(time.Duration(retries) * time.Second)
 		}
 		for _, duty := range duties.Data {
 			pubkey := strings.TrimPrefix(duty.Pubkey, "0x")
@@ -260,9 +291,18 @@ func queryForOptedInSlots(
 				if err != nil {
 					log.Fatalf("Failed to parse slot: %v", err)
 				}
-				blockNumber, err := getBlockNumberForSlot(ctx, slot, apiURL)
-				if err != nil {
-					log.Fatalf("Failed to get block number for slot: %v", err)
+				var blockNumber uint64
+				for retries := 0; retries < 5; retries++ {
+					blockNumber, err = getBlockNumberForSlot(ctx, slot, apiURL)
+					if err != nil {
+						fmt.Printf("Failed to get block number for slot: %v\n", err)
+						if retries == 4 {
+							log.Fatalf("Failed to get block number for slot: %v", err)
+						}
+					} else {
+						break
+					}
+					time.Sleep(time.Duration(retries) * time.Second)
 				}
 				if blockNumber >= validator.optInBlock {
 					optedInSlots = append(optedInSlots, optedInSlot{

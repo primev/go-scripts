@@ -13,6 +13,14 @@ import (
 	"github.com/primevprotocol/validator-registry/pkg/preconfmanager"
 )
 
+const (
+	PRECISION = 1e16
+)
+
+var (
+	BigOneHundredPercent = big.NewInt(100 * PRECISION)
+)
+
 func main() {
 
 	client, err := ethclient.Dial("https://chainrpc.mev-commit.xyz/")
@@ -57,16 +65,26 @@ func main() {
 	providerInQuestion := common.HexToAddress("0xE3d71EF44D20917b93AA93e12Bd35b0859824A8F")
 
 	totalBidAmt := big.NewInt(0)
+	totalDecayedBidAmt := big.NewInt(0)
 	numEvents := 0
 	for iter.Next() {
 		commitment := iter.Event
 		if commitment.Committer == providerInQuestion {
 			numEvents++
 			totalBidAmt.Add(totalBidAmt, commitment.BidAmt)
+			decayPercentage := computeResidualAfterDecay(
+				commitment.DecayStartTimeStamp,
+				commitment.DecayEndTimeStamp,
+				commitment.DispatchTimestamp,
+			)
+			decayedBidAmt := new(big.Int).Mul(commitment.BidAmt, decayPercentage)
+			decayedBidAmt = new(big.Int).Div(decayedBidAmt, BigOneHundredPercent)
+			totalDecayedBidAmt.Add(totalDecayedBidAmt, decayedBidAmt)
 		}
 	}
 	fmt.Println("Number of events: ", numEvents)
 	fmt.Println("Total bid amount: ", totalBidAmt)
+	fmt.Println("Total decayed bid amount: ", totalDecayedBidAmt)
 
 	iter2, err := bidderRegistry.FilterFundsRewarded(opts, nil, nil, []common.Address{providerInQuestion})
 	if err != nil {
@@ -79,4 +97,24 @@ func main() {
 		totatlFundsRewarded.Add(totatlFundsRewarded, reward.Amount)
 	}
 	fmt.Println("Total funds rewarded: ", totatlFundsRewarded)
+}
+
+// Copied from https://github.com/primev/mev-commit/blob/main/oracle/pkg/updater/updater.go
+func computeResidualAfterDecay(startTimestamp, endTimestamp, commitTimestamp uint64) *big.Int {
+	if startTimestamp >= endTimestamp || endTimestamp <= commitTimestamp {
+		log.Fatalf("timestamp out of range: %v, %v, %v", startTimestamp, endTimestamp, commitTimestamp)
+		return big.NewInt(0)
+	}
+	if startTimestamp > commitTimestamp {
+		return BigOneHundredPercent
+	}
+	totalTime := new(big.Int).SetUint64(endTimestamp - startTimestamp)
+	timePassed := new(big.Int).SetUint64(commitTimestamp - startTimestamp)
+	timeRemaining := new(big.Int).Sub(totalTime, timePassed)
+	scaledRemaining := new(big.Int).Mul(timeRemaining, BigOneHundredPercent)
+	residualPercentage := new(big.Int).Div(scaledRemaining, totalTime)
+	if residualPercentage.Cmp(BigOneHundredPercent) > 0 {
+		residualPercentage = BigOneHundredPercent
+	}
+	return residualPercentage
 }

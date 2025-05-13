@@ -28,12 +28,6 @@ func main() {
 		log.Fatalf("Failed to connect to the mev-commit chain client: %v", err)
 	}
 
-	chainID, err := client.ChainID(context.Background())
-	if err != nil {
-		log.Fatalf("Failed to get chain id: %v", err)
-	}
-	fmt.Println("Chain ID: ", chainID)
-
 	preconfManagerAddr := common.HexToAddress("0x3761bF3932cD22d684A7485002E1424c3aCCD69c")
 	preconfManager, err := preconfmanager.NewPreconfmanagerFilterer(preconfManagerAddr, client)
 	if err != nil {
@@ -50,7 +44,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get current block: %v", err)
 	}
-	fmt.Println("Current block: ", block.Number())
 
 	endBlock := block.Number().Uint64()
 	opts := &bind.FilterOpts{
@@ -65,26 +58,35 @@ func main() {
 	providerInQuestion := common.HexToAddress("0xE3d71EF44D20917b93AA93e12Bd35b0859824A8F")
 
 	totalBidAmt := big.NewInt(0)
-	totalDecayedBidAmt := big.NewInt(0)
-	numEvents := 0
+	totalDecayedBidAmtFixed := big.NewInt(0)
+	totalDecayedBidAmtWithBug := big.NewInt(0)
 	for iter.Next() {
 		commitment := iter.Event
 		if commitment.Committer == providerInQuestion {
-			numEvents++
 			totalBidAmt.Add(totalBidAmt, commitment.BidAmt)
-			decayPercentage := computeResidualAfterDecay(
+			decayPercentageFixed := computeResidualAfterDecay(
 				commitment.DecayStartTimeStamp,
 				commitment.DecayEndTimeStamp,
 				commitment.DispatchTimestamp,
+				true,
 			)
-			decayedBidAmt := new(big.Int).Mul(commitment.BidAmt, decayPercentage)
-			decayedBidAmt = new(big.Int).Div(decayedBidAmt, BigOneHundredPercent)
-			totalDecayedBidAmt.Add(totalDecayedBidAmt, decayedBidAmt)
+			decayPercentageWithBug := computeResidualAfterDecay(
+				commitment.DecayStartTimeStamp,
+				commitment.DecayEndTimeStamp,
+				commitment.DispatchTimestamp,
+				false,
+			)
+			decayedBidAmtFixed := new(big.Int).Mul(commitment.BidAmt, decayPercentageFixed)
+			decayedBidAmtWithBug := new(big.Int).Mul(commitment.BidAmt, decayPercentageWithBug)
+			decayedBidAmtFixed = new(big.Int).Div(decayedBidAmtFixed, BigOneHundredPercent)
+			decayedBidAmtWithBug = new(big.Int).Div(decayedBidAmtWithBug, BigOneHundredPercent)
+			totalDecayedBidAmtFixed.Add(totalDecayedBidAmtFixed, decayedBidAmtFixed)
+			totalDecayedBidAmtWithBug.Add(totalDecayedBidAmtWithBug, decayedBidAmtWithBug)
 		}
 	}
-	fmt.Println("Number of events: ", numEvents)
 	fmt.Println("Total bid amount: ", totalBidAmt)
-	fmt.Println("Total decayed bid amount: ", totalDecayedBidAmt)
+	fmt.Println("Total decayed bid amount (post PR #673): ", totalDecayedBidAmtFixed)
+	fmt.Println("Total decayed bid amount (pre PR #673): ", totalDecayedBidAmtWithBug)
 
 	iter2, err := bidderRegistry.FilterFundsRewarded(opts, nil, nil, []common.Address{providerInQuestion})
 	if err != nil {
@@ -96,17 +98,20 @@ func main() {
 		reward := iter2.Event
 		totatlFundsRewarded.Add(totatlFundsRewarded, reward.Amount)
 	}
-	fmt.Println("Total funds rewarded: ", totatlFundsRewarded)
+	fmt.Println("Total funds actually rewarded: ", totatlFundsRewarded)
 }
 
 // Copied from https://github.com/primev/mev-commit/blob/main/oracle/pkg/updater/updater.go
-func computeResidualAfterDecay(startTimestamp, endTimestamp, commitTimestamp uint64) *big.Int {
+func computeResidualAfterDecay(startTimestamp, endTimestamp, commitTimestamp uint64, fixedLogic bool) *big.Int {
 	if startTimestamp >= endTimestamp || endTimestamp <= commitTimestamp {
 		log.Fatalf("timestamp out of range: %v, %v, %v", startTimestamp, endTimestamp, commitTimestamp)
 		return big.NewInt(0)
 	}
 	if startTimestamp > commitTimestamp {
-		return BigOneHundredPercent
+		if fixedLogic {
+			return BigOneHundredPercent
+		}
+		return big.NewInt(0)
 	}
 	totalTime := new(big.Int).SetUint64(endTimestamp - startTimestamp)
 	timePassed := new(big.Int).SetUint64(commitTimestamp - startTimestamp)

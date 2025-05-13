@@ -85,8 +85,8 @@ func main() {
 		}
 	}
 	fmt.Println("Total bid amount: ", totalBidAmt)
-	fmt.Println("Total decayed bid amount (post PR #673): ", totalDecayedBidAmtFixed)
-	fmt.Println("Total decayed bid amount (pre PR #673): ", totalDecayedBidAmtWithBug)
+	fmt.Println("Total decayed bid amount (decay logic being post PR #673): ", totalDecayedBidAmtFixed)
+	fmt.Println("Total decayed bid amount (decay logic being pre PR #673): ", totalDecayedBidAmtWithBug)
 
 	iter2, err := bidderRegistry.FilterFundsRewarded(opts, nil, nil, []common.Address{providerInQuestion})
 	if err != nil {

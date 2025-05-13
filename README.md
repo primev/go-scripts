@@ -1,7 +1,6 @@
-# validator-registry
-Tools for programmatically interacting with the validator registry contract
+# go-scripts
 
-`/cmd/store-events` is only relevant for mev-commit chain, while `/cmd/migrate` is only relevant for mainnet.
+Misc go scripts. 
 
 ## Validator Registry (simple stake contract) migration history
 

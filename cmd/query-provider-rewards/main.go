@@ -70,9 +70,18 @@ func main() {
 
 	if *saveTxes {
 		txes := []string{}
+		decayedPayments := []*big.Int{}
 		for _, event := range events {
 			if event.Committer == providerInQuestion {
 				txes = append(txes, event.TxnHash)
+				resid := new(big.Int).Mul(event.BidAmt, computeResidualAfterDecay(
+					event.DecayStartTimeStamp,
+					event.DecayEndTimeStamp,
+					event.DispatchTimestamp,
+					false,
+				))
+				resid = new(big.Int).Div(resid, BigOneHundredPercent)
+				decayedPayments = append(decayedPayments, resid)
 			}
 		}
 		file, err := os.Create("committed_txes.csv")
@@ -83,11 +92,11 @@ func main() {
 		writer := csv.NewWriter(file)
 		defer writer.Flush()
 
-		if err := writer.Write([]string{"tx_hash"}); err != nil {
+		if err := writer.Write([]string{"tx_hash", "decayed_payment"}); err != nil {
 			log.Fatalf("Failed to write header: %v", err)
 		}
-		for _, tx := range txes {
-			if err := writer.Write([]string{tx}); err != nil {
+		for i, tx := range txes {
+			if err := writer.Write([]string{tx, decayedPayments[i].String()}); err != nil {
 				log.Fatalf("Failed to write tx: %v", err)
 			}
 		}

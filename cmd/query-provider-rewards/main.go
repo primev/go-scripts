@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"flag"
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -22,6 +25,9 @@ var (
 )
 
 func main() {
+
+	saveTxes := flag.Bool("save-txes", false, "save committed tx hashes to a file")
+	flag.Parse()
 
 	client, err := ethclient.Dial("https://chainrpc.mev-commit.xyz/")
 	if err != nil {
@@ -57,11 +63,42 @@ func main() {
 
 	providerInQuestion := common.HexToAddress("0xE3d71EF44D20917b93AA93e12Bd35b0859824A8F")
 
+	events := []preconfmanager.PreconfmanagerOpenedCommitmentStored{}
+	for iter.Next() {
+		events = append(events, *iter.Event)
+	}
+
+	if *saveTxes {
+		txes := []string{}
+		for _, event := range events {
+			if event.Committer == providerInQuestion {
+				txes = append(txes, event.TxnHash)
+			}
+		}
+		file, err := os.Create("committed_txes.csv")
+		if err != nil {
+			log.Fatalf("Failed to create file: %v", err)
+		}
+		defer file.Close()
+		writer := csv.NewWriter(file)
+		defer writer.Flush()
+
+		if err := writer.Write([]string{"tx_hash"}); err != nil {
+			log.Fatalf("Failed to write header: %v", err)
+		}
+		for _, tx := range txes {
+			if err := writer.Write([]string{tx}); err != nil {
+				log.Fatalf("Failed to write tx: %v", err)
+			}
+		}
+		fmt.Println("Saved txes to committed_txes.csv")
+	}
+
 	totalBidAmt := big.NewInt(0)
 	totalDecayedBidAmtFixed := big.NewInt(0)
 	totalDecayedBidAmtWithBug := big.NewInt(0)
-	for iter.Next() {
-		commitment := iter.Event
+	for _, event := range events {
+		commitment := event
 		if commitment.Committer == providerInQuestion {
 			totalBidAmt.Add(totalBidAmt, commitment.BidAmt)
 			decayPercentageFixed := computeResidualAfterDecay(

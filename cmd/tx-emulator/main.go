@@ -21,9 +21,9 @@ const (
 	rpcURL              = "http://localhost:8545"
 	dummyAddress        = "0x9999999999999999999999999999999999999999"
 	transferAmount      = 1000000000000000 // 0.001 ETH
-	txDelay             = 2 * time.Second
+	txDelay             = 200 * time.Millisecond
 	gasLimit            = 21000
-	confirmationTimeout = 5 * time.Minute // Max time to wait for confirmation
+	confirmationTimeout = 5 * time.Second
 )
 
 type Wallet struct {

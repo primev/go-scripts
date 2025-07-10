@@ -21,7 +21,7 @@ const (
 	rpcURL              = "http://localhost:8545"
 	dummyAddress        = "0x9999999999999999999999999999999999999999"
 	transferAmount      = 1000000000000000 // 0.001 ETH
-	txDelay             = 200 * time.Millisecond
+	txDelay             = 1 * time.Millisecond
 	gasLimit            = 21000
 	confirmationTimeout = 5 * time.Second
 )
@@ -94,7 +94,13 @@ func (w *Wallet) sendAndWaitForTransaction(ctx context.Context, to common.Addres
 		to.Hex(),
 		w.nonce)
 
-	// Wait for transaction to be mined with timeout
+	pendingTxes, err := w.client.PendingTransactionCount(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get pending transactions: %v", err)
+	}
+
+	log.Printf("Num pending txes: %d", pendingTxes)
+
 	confirmCtx, cancel := context.WithTimeout(ctx, confirmationTimeout)
 	defer cancel()
 
@@ -193,6 +199,9 @@ func main() {
 	var wg sync.WaitGroup
 	for i, wallet := range wallets {
 		wg.Add(1)
+
+		time.Sleep(time.Duration(i) * 69 * time.Millisecond)
+
 		go wallet.spamTransactions(ctx, &wg)
 		log.Printf("Started transaction spam from wallet %d (%s)", i, wallet.address.Hex())
 	}

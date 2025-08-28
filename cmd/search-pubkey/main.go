@@ -28,7 +28,7 @@ func main() {
 	}
 	fmt.Println("targetPubkey:", common.Bytes2Hex(targetPubkey))
 
-	client, err := ethclient.Dial("https://eth-mainnet.g.alchemy.com/v2/bz3jQOhNxXPWXUjqEfl1T4NwjR6pj72A")
+	client, err := ethclient.Dial("https://eth.llamarpc.com")
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}

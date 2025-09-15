@@ -136,19 +136,20 @@ func main() {
 
 		startBlock = endBlock + 1
 	}
-	sanityCheckAgainstRouter(optedInValidators, routerCaller)
+	optedInValidators = sanityCheckAgainstRouter(optedInValidators, routerCaller)
 	exportToCsv(optedInValidators)
 }
 
-func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller *validatoroptinrouter.ValidatoroptinrouterCaller) {
+func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller *validatoroptinrouter.ValidatoroptinrouterCaller) []optedInValidator {
 	batchSize := 50
+	filtered := make([]optedInValidator, 0, len(optedInValidators))
 	for i := 0; i < len(optedInValidators); i += batchSize {
 		end := i + batchSize
 		fmt.Printf("Checking batch %d to %d against router\n", i, end)
 		if end > len(optedInValidators) {
 			end = len(optedInValidators)
 		}
-		batch := make([][]byte, 0)
+		batch := make([][]byte, 0, end-i)
 		for _, validator := range optedInValidators[i:end] {
 			batch = append(batch, validator.pubKey)
 		}
@@ -160,12 +161,11 @@ func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller
 			if isOptedIn[idxValidator].IsAvsOptedIn ||
 				isOptedIn[idxValidator].IsMiddlewareOptedIn ||
 				isOptedIn[idxValidator].IsVanillaOptedIn {
-				// fmt.Printf("Val pubkey %s is opted in\n", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey))
-			} else {
-				panic(fmt.Sprintf("Val pubkey %s is not opted in", hex.EncodeToString(optedInValidators[i+idxValidator].pubKey)))
+				filtered = append(filtered, optedInValidators[i+idxValidator])
 			}
 		}
 	}
+	return filtered
 }
 
 func exportToCsv(optedInValidators []optedInValidator) {

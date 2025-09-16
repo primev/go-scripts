@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/hex"
@@ -136,8 +137,71 @@ func main() {
 
 		startBlock = endBlock + 1
 	}
-	optedInValidators = sanityCheckAgainstRouter(optedInValidators, routerCaller)
-	exportToCsv(optedInValidators)
+
+	// 1) B: deduped without sanity check
+	allDeduped := dedupeValidators(optedInValidators)
+
+	// 2) A: sanity checked (on deduped) and deduped again for safety (idempotent)
+	routerPassing := sanityCheckAgainstRouter(allDeduped, routerCaller)
+
+	// 3) Diff = B − A  (registered but fail the router sanity check)
+	routerFailing := diffByPubKey(allDeduped, routerPassing)
+
+	// 4) Exports (optional but handy)
+	exportToCsvAs("unique_optedIn_unchecked.csv", allDeduped)
+	exportToCsvAs("unique_optedIn_checked.csv", routerPassing)
+	exportToCsvAs("unique_check_failing_validators.csv", routerFailing)
+}
+
+// helper
+func dedupeValidators(in []optedInValidator) []optedInValidator {
+	m := make(map[string]optedInValidator, len(in))
+
+	for _, v := range in {
+		key := hex.EncodeToString(v.pubKey)
+
+		if exist, ok := m[key]; ok {
+			// keep earliest opt-in block
+			if v.optInBlock != 0 && (exist.optInBlock == 0 || v.optInBlock < exist.optInBlock) {
+				exist.optInBlock = v.optInBlock
+			}
+			// prefer first non-empty/zero values
+			if exist.optInType == "" && v.optInType != "" {
+				exist.optInType = v.optInType
+			}
+			if (exist.podOwner == common.Address{}) && (v.podOwner != common.Address{}) {
+				exist.podOwner = v.podOwner
+			}
+			if (exist.vault == common.Address{}) && (v.vault != common.Address{}) {
+				exist.vault = v.vault
+			}
+			if (exist.operator == common.Address{}) && (v.operator != common.Address{}) {
+				exist.operator = v.operator
+			}
+			if (exist.withdrawalAddr == common.Address{}) && (v.withdrawalAddr != common.Address{}) {
+				exist.withdrawalAddr = v.withdrawalAddr
+			}
+
+			m[key] = exist
+		} else {
+			m[key] = v
+		}
+	}
+
+	out := make([]optedInValidator, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
+	}
+
+	// deterministic order: by optInBlock asc, then by pubkey bytes
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].optInBlock == out[j].optInBlock {
+			return bytes.Compare(out[i].pubKey, out[j].pubKey) < 0
+		}
+		return out[i].optInBlock < out[j].optInBlock
+	})
+
+	return out
 }
 
 func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller *validatoroptinrouter.ValidatoroptinrouterCaller) []optedInValidator {
@@ -168,34 +232,51 @@ func sanityCheckAgainstRouter(optedInValidators []optedInValidator, routerCaller
 	return filtered
 }
 
-func exportToCsv(optedInValidators []optedInValidator) {
-	fmt.Printf("Exporting %d opted in validators to csv\n", len(optedInValidators))
-	csvFile, err := os.Create("opted_in_validators.csv")
+func diffByPubKey(minuend, subtrahend []optedInValidator) []optedInValidator {
+	// minuend: typically "all deduped"
+	// subtrahend: typically "sanity-checked deduped"
+	has := make(map[string]struct{}, len(subtrahend))
+	for _, v := range subtrahend {
+		has[hex.EncodeToString(v.pubKey)] = struct{}{}
+	}
+	out := make([]optedInValidator, 0)
+	for _, v := range minuend {
+		key := hex.EncodeToString(v.pubKey)
+		if _, ok := has[key]; !ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func exportToCsvAs(filename string, validators []optedInValidator) {
+	fmt.Printf("Exporting %d validators to %s\n", len(validators), filename)
+	csvFile, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)
 	}
 	defer csvFile.Close()
 
-	sort.Slice(optedInValidators, func(i, j int) bool {
-		return optedInValidators[i].optInBlock < optedInValidators[j].optInBlock
+	sort.Slice(validators, func(i, j int) bool {
+		return validators[i].optInBlock < validators[j].optInBlock
 	})
 
 	writer := csv.NewWriter(csvFile)
-	writer.Write([]string{"pubKey", "optInBlock", "optInType", "podOwner", "vault", "operator", "withdrawalAddr"})
-	for _, validator := range optedInValidators {
-		writer.Write([]string{
-			hex.EncodeToString(validator.pubKey),
-			fmt.Sprintf("%d", validator.optInBlock),
-			validator.optInType,
-			validator.podOwner.Hex(),
-			validator.vault.Hex(),
-			validator.operator.Hex(),
-			validator.withdrawalAddr.Hex(),
+	_ = writer.Write([]string{"pubKey", "optInBlock", "optInType", "podOwner", "vault", "operator", "withdrawalAddr"})
+	for _, v := range validators {
+		_ = writer.Write([]string{
+			hex.EncodeToString(v.pubKey),
+			fmt.Sprintf("%d", v.optInBlock),
+			v.optInType,
+			v.podOwner.Hex(),
+			v.vault.Hex(),
+			v.operator.Hex(),
+			v.withdrawalAddr.Hex(),
 		})
 	}
 	writer.Flush()
 	if err := writer.Error(); err != nil {
 		log.Fatalf("Failed to write CSV file: %v", err)
 	}
-	fmt.Printf("Exported %d opted in validators to csv\n", len(optedInValidators))
+	fmt.Printf("Export complete: %s (%d rows)\n", filename, len(validators))
 }

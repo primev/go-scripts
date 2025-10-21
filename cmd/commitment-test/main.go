@@ -44,7 +44,8 @@ func main() {
 	}
 
 	for iter.Next() {
-		fmt.Println(iter.Event.BlockNumber)
+		fmt.Println("Block number: ", iter.Event.BlockNumber)
+		fmt.Println("Committer: ", iter.Event.Committer)
 	}
 
 	if err := iter.Error(); err != nil {

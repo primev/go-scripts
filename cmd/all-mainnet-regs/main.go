@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -37,9 +38,13 @@ type optedInValidator struct {
 }
 
 func main() {
+	rpcURL := flag.String("rpc-url", "https://ethereum-rpc.publicnode.com", "Ethereum RPC URL")
+	beaconAPIKey := flag.String("beacon-api-key", "", "beaconcha.in API key")
+	flag.Parse()
+
 	rand.Seed(time.Now().UnixNano())
 
-	client, err := ethclient.Dial("https://ethereum-rpc.publicnode.com")
+	client, err := ethclient.Dial(*rpcURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
@@ -154,6 +159,7 @@ func main() {
 		routerFailing,
 		allUncheckedIncludingDuplicates,
 		333*time.Millisecond,
+		*beaconAPIKey,
 	)
 }
 
@@ -288,6 +294,7 @@ func exportWorkbookXLSX(
 	failed []optedInValidator,
 	allIncludingDups []optedInValidator,
 	requestDelay time.Duration,
+	beaconAPIKey string,
 ) {
 	if requestDelay <= 0 {
 		requestDelay = 500 * time.Millisecond
@@ -335,14 +342,41 @@ func exportWorkbookXLSX(
 		log.Fatalf("Failed to get sheet index for %s: %v", beaconSheet, err)
 	}
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	beaconBatchSize := 100
 
-	for i, v := range routerPassing {
+	// Build lookup of pubkey hex -> beacon data
+	beaconData := make(map[string]beaconValidatorData, len(routerPassing))
+
+	for i := 0; i < len(routerPassing); i += beaconBatchSize {
 		if i > 0 {
 			time.Sleep(requestDelay)
 		}
-		rowNum := i + 2
+		end := i + beaconBatchSize
+		if end > len(routerPassing) {
+			end = len(routerPassing)
+		}
 
+		pubkeys := make([]string, 0, end-i)
+		for _, v := range routerPassing[i:end] {
+			pubkeys = append(pubkeys, hex.EncodeToString(v.pubKey))
+		}
+
+		fmt.Printf("  beacon batch %d-%d / %d\n", i+1, end, len(routerPassing))
+
+		results, err := fetchBeaconchaInValidatorBatch(httpClient, pubkeys, beaconAPIKey)
+		if err != nil {
+			log.Printf("WARN: beacon batch fetch failed (%d-%d): %v", i+1, end, err)
+			continue
+		}
+		for k, v := range results {
+			beaconData[k] = v
+		}
+	}
+
+	// Write rows using fetched beacon data
+	for i, v := range routerPassing {
+		rowNum := i + 2
 		pubKeyHex := hex.EncodeToString(v.pubKey)
 
 		beaconStatus := ""
@@ -351,17 +385,12 @@ func exportWorkbookXLSX(
 		lastTime := ""
 		isExitedLike := ""
 
-		resp, err := fetchBeaconchaInValidator(client, pubKeyHex)
-		if err != nil {
-			log.Printf("WARN: beacon status fetch failed (%d/%d) pubkey=%s err=%v", i+1, len(routerPassing), pubKeyHex, err)
-			beaconStatus = "ERROR: " + err.Error()
-		} else {
-			beaconStatus = resp.Data.Status
-			validatorIndex = fmt.Sprintf("%d", resp.Data.ValidatorIndex)
-			lastSlot := resp.Data.LastAttestationSlot
-			lastSlotStr = fmt.Sprintf("%d", lastSlot)
-			if lastSlot > 0 {
-				lastTime = slotToTimeUTC(lastSlot).Format(time.RFC3339)
+		if bd, ok := beaconData[pubKeyHex]; ok {
+			beaconStatus = bd.Status
+			validatorIndex = fmt.Sprintf("%d", bd.ValidatorIndex)
+			lastSlotStr = fmt.Sprintf("%d", bd.LastAttestationSlot)
+			if bd.LastAttestationSlot > 0 {
+				lastTime = slotToTimeUTC(bd.LastAttestationSlot).Format(time.RFC3339)
 			}
 			s := strings.ToLower(beaconStatus)
 			if strings.HasPrefix(s, "exited") || strings.Contains(s, "withdraw") {
@@ -369,6 +398,8 @@ func exportWorkbookXLSX(
 			} else {
 				isExitedLike = "false"
 			}
+		} else {
+			beaconStatus = "NOT_FOUND"
 		}
 
 		values := []any{
@@ -389,10 +420,6 @@ func exportWorkbookXLSX(
 		for c, val := range values {
 			cell, _ := excelize.CoordinatesToCellName(c+1, rowNum)
 			_ = f.SetCellValue(beaconSheet, cell, val)
-		}
-
-		if (i+1)%200 == 0 {
-			fmt.Printf("  beacon sheet progress: %d/%d\n", i+1, len(routerPassing))
 		}
 	}
 
@@ -451,22 +478,29 @@ func slotToTimeUTC(slot uint64) time.Time {
 	return ethMainnetGenesis.Add(time.Duration(slot*secondsPerSlot) * time.Second)
 }
 
-type beaconValidatorResp struct {
-	Status string `json:"status"`
-	Data   struct {
-		Status              string      `json:"status"`
-		ValidatorIndex      uint64      `json:"validatorindex"`
-		LastAttestationSlot uint64      `json:"lastattestationslot"`
-		ExitEpoch           json.Number `json:"exitepoch"`
-	} `json:"data"`
+type beaconValidatorData struct {
+	Status              string      `json:"status"`
+	ValidatorIndex      uint64      `json:"validatorindex"`
+	LastAttestationSlot uint64      `json:"lastattestationslot"`
+	ExitEpoch           json.Number `json:"exitepoch"`
+	Pubkey              string      `json:"pubkey"`
 }
 
-func fetchBeaconchaInValidator(client *http.Client, pubkeyHex string) (*beaconValidatorResp, error) {
-	pubkey := pubkeyHex
-	if !strings.HasPrefix(pubkey, "0x") {
-		pubkey = "0x" + pubkeyHex
+// fetchBeaconchaInValidatorBatch fetches up to 100 validators in a single request.
+// Returns a map from pubkey hex (without 0x prefix) to the validator data.
+func fetchBeaconchaInValidatorBatch(client *http.Client, pubkeyHexes []string, apiKey string) (map[string]beaconValidatorData, error) {
+	prefixed := make([]string, len(pubkeyHexes))
+	for i, pk := range pubkeyHexes {
+		if !strings.HasPrefix(pk, "0x") {
+			prefixed[i] = "0x" + pk
+		} else {
+			prefixed[i] = pk
+		}
 	}
-	url := "https://beaconcha.in/api/v1/validator/" + pubkey
+	url := "https://beaconcha.in/api/v1/validator/" + strings.Join(prefixed, ",")
+	if apiKey != "" {
+		url += "?apikey=" + apiKey
+	}
 
 	const maxAttempts = 6
 	baseDelay := 750 * time.Millisecond
@@ -492,13 +526,39 @@ func fetchBeaconchaInValidator(client *http.Client, pubkeyHex string) (*beaconVa
 		_ = resp.Body.Close()
 
 		if resp.StatusCode == 200 {
-			var out beaconValidatorResp
-			dec := json.NewDecoder(bytes.NewReader(body))
-			dec.UseNumber()
-			if err := dec.Decode(&out); err != nil {
-				return nil, fmt.Errorf("failed to decode beaconcha.in JSON: %w (body=%s)", err, string(body))
+			result := make(map[string]beaconValidatorData, len(pubkeyHexes))
+
+			if len(pubkeyHexes) == 1 {
+				// single validator: response has Data as object
+				var single struct {
+					Data beaconValidatorData `json:"data"`
+				}
+				dec := json.NewDecoder(bytes.NewReader(body))
+				dec.UseNumber()
+				if err := dec.Decode(&single); err != nil {
+					return nil, fmt.Errorf("failed to decode beaconcha.in JSON: %w (body=%s)", err, string(body))
+				}
+				key := strings.TrimPrefix(strings.ToLower(single.Data.Pubkey), "0x")
+				if key == "" {
+					key = pubkeyHexes[0]
+				}
+				result[key] = single.Data
+			} else {
+				// multiple validators: response has Data as array
+				var multi struct {
+					Data []beaconValidatorData `json:"data"`
+				}
+				dec := json.NewDecoder(bytes.NewReader(body))
+				dec.UseNumber()
+				if err := dec.Decode(&multi); err != nil {
+					return nil, fmt.Errorf("failed to decode beaconcha.in JSON: %w (body=%s)", err, string(body))
+				}
+				for _, d := range multi.Data {
+					key := strings.TrimPrefix(strings.ToLower(d.Pubkey), "0x")
+					result[key] = d
+				}
 			}
-			return &out, nil
+			return result, nil
 		}
 
 		if resp.StatusCode == 429 || (resp.StatusCode >= 500 && resp.StatusCode <= 599) {

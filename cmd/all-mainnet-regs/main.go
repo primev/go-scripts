@@ -27,6 +27,10 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+// USAGE: go run ./cmd/all-mainnet-regs -beacon-api-key <key>
+// optional flag:
+// -rpc-url <rpc_url> (default: https://ethereum-rpc.publicnode.com)
+
 type optedInValidator struct {
 	pubKey         []byte
 	optInType      string
@@ -158,7 +162,7 @@ func main() {
 		allDeduped,
 		routerFailing,
 		allUncheckedIncludingDuplicates,
-		333*time.Millisecond,
+		1*time.Second,
 		*beaconAPIKey,
 	)
 }
